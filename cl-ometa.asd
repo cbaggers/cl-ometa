@@ -15,14 +15,3 @@
                              (:file "ometa-base")
                              (:file "stream")
                              (:file "error")))))
-;; (defpackage ometaes
-;;   (:use :cl))
-
-;; (in-package :ometa)
-
-;; (defun c-and-l (files)
-;;   (dolist (f files)
-;;     (compile-file f)
-;;     (load f)))
-
-;; (c-and-l '("error" "stream" "ometa-base" "ometa-parser" "test"))

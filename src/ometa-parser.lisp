@@ -370,43 +370,45 @@
     (coerce xs 'string)))
                           
 
+(defmethod o-prod-app ((o ometa-parser))
+  (core-or o
+
 ;; prod-app = "<" identifier:p ">" 
 ;;                => `(apply ,p)
 ;;           |  identifier:p
 ;;                => `(apply ,p)
 ;;           ;
-;; prod-app = "<" identifier:p prod-arg-list:args ">" 
-;;                => `(apply-with-args ,p (arguments ,@args))
-;;           ;
-;; prod-app = "^"
-;;             => `(apply-super-with-args ,(ometa-current-rule o) (arguments))
-;;           |  "<^" prod-arg-list:args ">"
-;;             => `(apply-super-with-args ,(ometa-current-rule o) (arguments ,@args))
-;;           ;
-(defmethod o-prod-app ((o ometa-parser))
-  (core-or o
            (lambda ()
              (core-apply-with-args o 'o-seq-s '(#\<))
              (let ((p (core-apply o 'o-identifier)))
                (core-apply-with-args o 'o-seq-s '(#\>))
                `(apply ,p)))
            (lambda ()
+             (let ((p (core-apply o 'o-identifier)))
+               `(apply ,p)))
+
+;; prod-app = "<" identifier:p prod-arg-list:args ">" 
+;;                => `(apply-with-args ,p (arguments ,@args))
+;;           ;
+           (lambda ()
              (core-apply-with-args o 'o-seq-s '(#\<))
              (let ((p (core-apply o 'o-identifier)))
                (let ((args (core-apply o 'o-prod-arg-list)))
                  (core-apply-with-args o 'o-seq-s '(#\>))
                  `(apply-with-args ,p (arguments ,@args)))))
+;; prod-app = "^"
+;;             => `(apply-super-with-args ,(ometa-current-rule o) (arguments))
+;;           |  "<^" prod-arg-list:args ">"
+;;             => `(apply-super-with-args ,(ometa-current-rule o) (arguments ,@args))
+;;           ;
            (lambda ()
              (core-apply-with-args o 'o-seq-s '(#\^))
              `(apply-super ,(ometa-current-rule o)))
            (lambda ()
-             (core-apply-with-args o 'o-seq-s '(#\> #\^))
+             (core-apply-with-args o 'o-seq-s '(#\< #\^))
              (let ((args (core-apply o 'o-prod-arg-list)))
                (core-apply-with-args o 'o-seq-s '(#\>))
-               `(apply-super-with-args ,(ometa-current-rule o) (arguments ,@args))))
-           (lambda ()
-             (let ((p (core-apply o 'o-identifier)))
-               `(apply ,p)))))
+               `(apply-super-with-args ,(ometa-current-rule o) (arguments ,@args))))))
  
 
 ;;  prod-arg-list  = prod-arg:x {"," prod-arg:a => a}*:xs => (cons x xs);

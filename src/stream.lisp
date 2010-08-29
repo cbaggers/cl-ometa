@@ -55,7 +55,7 @@
 (defmethod stream-tail ((s ometa-stream))
   (if (not (null (slot-value s 'tail)))
       (slot-value s 'tail)
-      (setf (slot-value s 'tail) 
+      (setf (slot-value s 'tail)
             (new-ometa-stream (stream-input s)
                               (1+ (stream-index s))))))
       
