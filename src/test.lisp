@@ -1,5 +1,3 @@
-(in-package :ometa)
-
 
 (defun file-string (path)
   (with-open-file (s path)

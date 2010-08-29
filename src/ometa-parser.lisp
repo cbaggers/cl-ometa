@@ -1,5 +1,3 @@
-(in-package :ometa)
-
 (defclass ometa-parser (ometa-base) 
   ((current-rule :initform nil 
                  :accessor ometa-current-rule)

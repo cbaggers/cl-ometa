@@ -1,6 +1,3 @@
-(in-package :ometa)
-
-
 ;; error reporting
 
 (defstruct error-data pos found message)

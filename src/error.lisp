@@ -1,5 +1,3 @@
-(in-package :ometa)
-
 (defclass ometa-error-type () ())
 (defun throw-ometa-error () (throw 'ometa (make-instance 'ometa-error-type)))
 

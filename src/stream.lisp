@@ -1,5 +1,3 @@
-(in-package :ometa)
-
 (defclass ometa-stream ()
   ((head   :accessor stream-head
            :initarg :head)   
