@@ -1,4 +1,3 @@
-;C-c C-d h -> context help
 (in-package :ometa)
 
 (defclass ometa-stream ()
@@ -11,13 +10,24 @@
            :initform -1)
    (tail   :initarg :tail
            :initform nil)
-   (memo   :initform nil)))
+   (memo   :initform (make-hash-table)
+           :accessor stream-memo)))
 
 (defclass ometa-stream-end (ometa-stream) ())
 (defmethod stream-head  ((s ometa-stream-end)) (throw-ometa-error))
 (defmethod stream-tail  ((s ometa-stream-end)) (throw-ometa-error))
-;(defmethod stream-input ((s ometa-stream-end)) (throw-ometa-error))
-;(defmethod stream-index   ((s ometa-stream-end)) -1)
+
+(defclass stream-memo ()
+  ((next   :accessor stream-memo-next
+           :initarg :next)
+   (result :accessor stream-memo-result
+           :initarg :result)))
+
+(defmethod stream-memo-for ((s ometa-stream) rule)
+  (gethash rule (stream-memo s)))
+
+(defmethod stream-memoize ((s ometa-stream) rule next res)
+  (setf (gethash rule (stream-memo s)) (make-instance 'stream-memo :next next :result res)))
 
 ;public
 ;TODO: polimorph/generalize on seq (string, form, etc..). 'char' is specific of string
@@ -52,11 +62,18 @@
                               (1+ (stream-index s))))))
       
 
-(defmethod stream-current-word ((s ometa-stream))
-  (let ((found (subseq (stream-input s) (stream-index s) 
-                       (position #\Space (stream-input s) :start (stream-index s)))))
-    (concatenate 'string  "'" found "'")))
-               
+(defmethod stream-length ((s ometa-stream))
+  (array-total-size (stream-input s)))
+
+(defmethod stream-current-phrase ((s ometa-stream))
+  (let* ((begin (stream-index s))
+         (len (stream-length s))
+         (left (- len (stream-index s))))
+    (concatenate 'string
+                 "'"
+                 (subseq (stream-input s) begin (if (< left 10) len (+ begin 10)))
+                 "'")))
+
 
 ;; (defun test-slots (s)
 ;;   (list (slot-value s 'head)

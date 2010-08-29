@@ -8,12 +8,48 @@
       (values data (read-sequence data s)))))
 
 (defun test ()
-  (let ((src (file-string "test.g")))
+  (let ((src (file-string "ometa-parser.g")))
     (ometa-match src 'o-ometa)))
 
 
-(defun test-s ()
-  (let ((res (test))) (if (eq (car res) 'error) 'error res)))
+(defun texp ()  
+  (let ((res (ometa-match "t?;" 'o-choice)))
+    (format t "~A" res)
+    res))
+
+;; (defun texp ()  
+;;   (let ((res (ometa-match "xyzR" 'test1)))
+;;     (format t "~A" res)
+;;     res))
+
+
+;; (setq x (make-hash-table))
+;; (setf (gethash 'r1 x) '(a b c))
+;; (setf (gethash 'r2 x) '(d e f))
+
+;; (setq z (gethash 'um x)) 
+;; (maphash (lambda (k v) (cons k (list v))) x)
+;; (push 'a (gethash 'um x))
+
+;; (push 'a z)
+
+;; (map 'string (lambda (k) k) x)
+
+;; (with-hash-table-iterator (my-iterator x)
+;;     (loop
+;;       (multiple-value-bind (entry-p key value)
+;;           (my-iterator)
+;;         (if entry-p
+;;             (print-hash-entry key value)
+;;             (return)))))
+
+;; (setq res '())
+;; (maphash (lambda (k v) (setq res (cons (list k v) res))) x)
+;; res
+;; (defun test-s ()
+;;   (let ((res (test))) (if (eq (car res) 'error) 'error res)))
+
+
 
 ;; (defun file-forms (path)
 ;;   "Sucks up an entire file from PATH into a list of forms (sexprs),

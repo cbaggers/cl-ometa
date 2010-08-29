@@ -1,3 +1,22 @@
+(in-package :asdf)
+
+(defpackage :cl-ometa (:use :cl :asdf))
+
+(in-package :cl-ometa)
+
+(defsystem :cl-ometa
+  :name "cl-ometa"
+  :author "Thago Silva <thiago@comum.org>"
+  :description "A Common Lisp OMeta implementation"
+  :license "MIT"
+  :components ((:module "src"
+                :serial t
+                :components ((:file "packages")
+                             (:file "specials")
+                             (:file "utils")
+                             (:file "tree")
+                             (:file "tests")))))
+
 ;; (require :asdf)
 ;; (require :asdf-install)
 ;; (asdf-install:install :avl-tree)
@@ -14,9 +33,9 @@
 
 (in-package :ometa)
 
+(defun c-and-l (files)
+  (dolist (f files)
+    (compile-file f)
+    (load f)))
 
-(load "error")
-(load "stream")
-(load "ometa-base")
-(load "ometa-parser")
-(load "test")
+(c-and-l '("error" "stream" "ometa-base" "ometa-parser" "test"))

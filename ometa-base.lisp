@@ -28,7 +28,7 @@
 (defclass ometa-base ()
   ((input        :accessor ometa-input     :initarg :input)
    (errors       :accessor ometa-reporting :initform (make-error-reporting))
-   (rules        :accessor ometa-rules     :initform nil)
+   (rules        :accessor ometa-rules     :initform nil) ;;list of rules to report errors on
    (dbg-indent   :accessor dbg-indent      :initform "")))
 
 (defmethod inc-dbg-indent ((o ometa-base))
@@ -37,13 +37,14 @@
 (defmethod dec-dbg-indent ((o ometa-base))
   (setf (dbg-indent o) (subseq (dbg-indent o) 0 (1- (array-total-size (dbg-indent o))))))
 
-
 (defmethod ometa-add-error ((o ometa-base) pos msg)
   (setf (ometa-reporting o) 
-        (add-error (ometa-reporting o) pos (stream-current-word (ometa-input o)) msg)))
+        (add-error (ometa-reporting o) pos (stream-current-phrase (ometa-input o)) msg)))
 
+
+;  (find rule (ometa-rules o)))
 (defmethod ometa-report-on ((o ometa-base) rule)
-  (find rule (ometa-rules o)))
+  t)
 
 (defmethod ometa-current-pos ((o ometa-base))
   (stream-index (ometa-input o)))
@@ -51,26 +52,59 @@
 (defmethod ometa-stream-head ((o ometa-base))
   (stream-head (ometa-input o)))
 
+
+
 ;; core functions
+;; unmemoized-version
+;; (defmethod core-apply ((o ometa-base) rule)
+;;   (let ((res (catch 'ometa (funcall rule o))))
+;;     (if (ometa-errorp res)
+;;         (throw 'ometa res)
+;;         res)))
+
+;; TODO: memoize failures
 (defmethod core-apply ((o ometa-base) rule)
-  (catch 'ometa (funcall rule o)))
+  (format t "~A [i] ~A~%" (dbg-indent o) rule)
+  (inc-dbg-indent o)
+  (let ((d-begin (ometa-current-pos o)))
+    (let ((orig-input (ometa-input o)))
+      (let ((memo (stream-memo-for (ometa-input o) rule)))
+        (if memo
+            (progn
+              ;; (format t "m[~A] current: ~A, memo:[pos: ~A res: ~A] ] ~%" rule
+              ;;         (ometa-current-pos o) (stream-index (stream-memo-next memo)) (stream-memo-result memo))
+              (dec-dbg-indent o)
+              (format t "~A [o] ~A [memo]~%" (dbg-indent o) rule)
+              (setf (ometa-input o) (stream-memo-next memo))
+              (stream-memo-result memo))
+            (let ((res (catch 'ometa (funcall rule o))))
+              (if (ometa-errorp res)
+                  (progn 
+                    (format t "~A [o] ~A [error]~%" (dbg-indent o) rule)
+                    (dec-dbg-indent o)
+                    (throw 'ometa res))
+                  (progn
+                    (stream-memoize orig-input rule (ometa-input o) res)
+                    (format t "~A [o] ~A [match]~%" (dbg-indent o) rule)
+                    (dec-dbg-indent o)))
+              res))))))
 
 ;; debugging / reporting
-(defmethod core-apply :around ((o ometa-base) rule)  
-  (let ((debug-begin (stream-index (ometa-input o))))    
-    (if (ometa-report-on o rule) (inc-dbg-indent o))
-    (let ((res (call-next-method)))
-      (if (ometa-errorp res)
-          (progn
-            (if (ometa-report-on o rule)
-                (ometa-add-error o (stream-index (ometa-input o)) (make-message rule)))
-            (if (ometa-report-on o rule) (dec-dbg-indent o))
-            (throw 'ometa res))
-          (if (ometa-report-on o rule)
-              (format t "~A-~A on '~A'~%" (dbg-indent o) rule  
-                      (subseq (stream-input (ometa-input o)) debug-begin (stream-index (ometa-input o))))))
-      (if (ometa-report-on o rule) (dec-dbg-indent o))
-      res)))
+ ;; (defmethod core-apply :around ((o ometa-base) rule)  
+ ;;   (let ((debug-begin (stream-index (ometa-input o))))    
+ ;;     (if (ometa-report-on o rule) (inc-dbg-indent o))
+ ;;     (let ((res (call-next-method)))
+ ;;       (if (ometa-errorp res)
+ ;;           (progn
+ ;;             (if (ometa-report-on o rule)
+ ;;                 (ometa-add-error o (stream-index (ometa-input o)) (make-message rule)))
+ ;;             (if (ometa-report-on o rule) (dec-dbg-indent o))
+ ;;             (throw 'ometa res))
+ ;;           (if (ometa-report-on o rule)
+ ;;               (format t "~A-~A on '~A'~%" (dbg-indent o) rule  
+ ;;                       (subseq (stream-input (ometa-input o)) debug-begin (stream-index (ometa-input o))))))
+ ;;       (if (ometa-report-on o rule) (dec-dbg-indent o))
+ ;;       res)))
 
 (defmethod core-apply-with-args ((o ometa-base) rule &rest args)
   (dolist (arg (reverse args))
@@ -251,6 +285,12 @@
            (lambda () (core-apply o 'o-letter))
            (lambda () (core-apply o 'o-digit))))
 
+(defmethod o-alpha-char ((o ometa-base))
+  (core-or o
+           (lambda () (core-apply o 'o-letter-or-digit))
+           (lambda () (core-apply-with-args o 'o-exactly #\_))
+           (lambda () (core-apply-with-args o 'o-exactly #\-))))
+
 (defmethod o-first-and-rest ((o ometa-base))
   (let* ((first (core-apply o 'o-anything))
          (rest  (core-apply o 'o-anything)))
@@ -269,12 +309,18 @@
     res))
 
 (defmethod o-token ((o ometa-base))
-  (coerce (core-apply-with-args o 'o-first-and-rest 'o-letter 'o-letter-or-digit) 'string))
+  (coerce (core-apply-with-args o 'o-first-and-rest 'o-letter 'o-alpha-char) 'string))
 
 ;; (defmethod o-token-s ((o ometa-base))
-;;   (let ((res (core-apply o 'o-token)))
+;;   (let ((res (coerce 
+;;               (core-apply-with-args o 
+;;                                     'o-first-and-rest 
+;;                                     'o-letter 
+;;                                     'o-letter-or-digit) 'string)))
 ;;     (core-apply o 'o-spaces)
 ;;     res))
+
+    
 
 (defmethod o-identifier ((o ometa-base))
   (let ((ret (core-apply o 'o-token)))

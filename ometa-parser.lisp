@@ -1,7 +1,19 @@
 (in-package :ometa)
 
 (defclass ometa-parser (ometa-base) 
-  ((current-rule :initform nil :accessor ometa-current-rule)))
+  ((current-rule :initform nil 
+                 :accessor ometa-current-rule)
+   (local-variables :initform (make-hash-table)
+                    :accessor ometa-local-variables)))
+
+(defmethod ometa-add-local-var ((o ometa-parser) var)
+  (let ((rule (ometa-current-rule o)))
+    (push var (gethash rule (ometa-local-variables o)))))
+
+(defmethod ometa-local-variables-list ((o ometa-parser))
+  (let ((res nil))
+    (maphash (lambda (k v) (setq res (cons (list k v) res))) (ometa-local-variables o))
+    res))
 
 ;;   space = '/*' { ~'*/' _}* '*/'
 ;;         | ^
@@ -28,7 +40,7 @@
       (let ((r (core-apply o 'o-rules)))
         (core-apply-with-args o 'o-seq-s '(#\}))
         (core-apply o 'o-end)
-        `(grammar ,name ,i ,@r)))))
+        `(grammar ,name ,i (locals ,(ometa-local-variables-list o)) ,@r)))))
 
 ;;   inheritance = "<:" identifier:i => `(parent ,i)
 ;;               |                   => `(parent OMeta)
@@ -64,7 +76,7 @@
         r))))
 
 ;; rule-rest = "=" choices
-;;    *       |  action
+;;           |  action
 ;;           |  argument+:args "=" choices:c => `(and ,@args ,c)
 ;;           |  argument+:args  action:ac      => `(and ,@args ,ac)
 ;;           ;
@@ -218,7 +230,7 @@
                `(sem-predicate ,s)))
            (lambda ()
              (core-apply-with-args o 'o-seq-s '(#\{))
-             (let ((c (core-apply o 'o-choice)))
+             (let ((c (core-apply o 'o-choices)))
                (core-apply-with-args o 'o-seq-s '(#\}))
                c))))
              
@@ -254,34 +266,111 @@
 ;;action   = "=>" host-lang-expr:s => `(action ,s);
 (defmethod o-action ((o ometa-parser))
   (core-apply-with-args o 'o-seq-s '(#\= #\>))
-  (let ((s (core-apply o 'host-lang-expr)))
+  (let ((s (core-apply o 'o-host-lang-expr)))
     `(action ,s)))
 
 
-;; TODO
-(defmethod host-lang-expr ((o ometa-parser))
-  (core-apply-with-args o 'o-exactly #\X))
-
-  ;; host-lang-expr  = host-lang-quote:q host-lang-expand:e host-lang-s-expr:s => (string-trim '(#\Space #\Tab #\Newline) (concatenate 'string q e s));
-
-  ;; host-lang-quote  = {'`'+:q => (coerce q 'string) | '\''+:q => (coerce q 'string) | => ""};
-
-  ;; host-lang-expand = {','+:q => (coerce q 'string) | => ""}:qq  {'@':a => (coerce a 'string) | => ""}:aa => (concatenate 'string qq aa);
-
-  ;; host-lang-s-expr  = host-lang-atom
-  ;;                   |  "(" { host-lang-atom | host-lang-expr }*:x ")"
-  ;;                       =>  (concatenate 'string "(" x ")")
-  ;;                   ;
-
-  ;; host-lang-atom    = host-lang-quote:q host-lang-expand:e 
-  ;;                       { s-identifier | string-literal:l => (coerce `(#\" ,@l #\") 'string)}:a => (concatenate 'string q e a);
-
-  ;; s-identifier = {~{space | ';' | '(' | ')' | '}' | '{' | '|' } char:c => c}+:xs spaces 
-  ;;                => (coerce xs 'string);
+;; host-lang-expr  = host-lang-quote:q host-lang-expand:e host-lang-s-expr:s => (string-trim '(#\Space #\Tab #\Newline) (concatenate 'string q e s));
+(defmethod o-host-lang-expr ((o ometa-parser))
+  (let ((q (core-apply o 'o-host-lang-quote)))
+    (let ((e (core-apply o 'o-host-lang-expand)))
+      (let ((s (core-apply o 'o-host-lang-s-expr)))
+        (string-trim '(#\Space #\Tab #\Newline) (concatenate 'string q e s))))))
 
 
+;; host-lang-quote  = {'`'+:q => (coerce q 'string) | '\''+:q => (coerce q 'string) | => ""};
+(defmethod o-host-lang-quote ((o ometa-parser))
+  (core-or o
+           (lambda ()
+             (let ((q (core-many1 o 
+                                  (lambda()
+                                    (core-apply-with-args o 'o-exactly #\`)))))
+               (coerce q 'string)))
+           (lambda ()
+             (let ((z (core-many1 o
+                                  (lambda ()
+                                    (core-apply-with-args o 'o-exactly #\')))))
+               (coerce z 'string)))
+           (lambda () "")))
+
+;; host-lang-expand = {','+:q => (coerce q 'string) | => ""}:qq  {'@':a => (coerce a 'string) | => ""}:aa => (concatenate 'string qq aa);
+(defmethod o-host-lang-expand ((o ometa-parser))
+  (let ((qq (core-or o
+                     (lambda ()
+                       (let ((q (core-many1 o 
+                                            (lambda ()
+                                              (core-apply-with-args o 'o-exactly #\,)))))
+                         (concatenate 'string q)))
+                     (lambda () ""))))
+    (let ((aa (core-or o
+                       (lambda ()
+                         (let ((a (core-apply-with-args o 'o-exactly #\@)))
+                           (string a)))
+                       (lambda () ""))))
+      (concatenate 'string qq aa))))
+
+    
+;; host-lang-s-expr  = host-lang-atom
+;;                   |  "(" { host-lang-atom | host-lang-expr }*:x ")"
+;;                       =>  (concatenate 'string "(" x ")")
+;;                   ;
+(defmethod o-host-lang-s-expr ((o ometa-parser))
+  (core-or o
+           (lambda ()
+             (core-apply o 'o-host-lang-atom))
+           (lambda ()
+             (core-apply-with-args o 'o-seq-s '(#\())
+             (let ((x (core-many o
+                                 (lambda ()
+                                   (core-or o
+                                            (lambda ()
+                                              (core-apply o 'o-host-lang-atom))
+                                            (lambda ()
+                                              (core-apply o 'o-host-lang-expr)))))))
+               (core-apply-with-args o 'o-seq-s '(#\)))
+               (concatenate 'string "(" (reduce (lambda (a b) (concatenate 'string a " " b)) x) ")")))))
 
 
+;; host-lang-atom    = host-lang-quote:q host-lang-expand:e 
+;;                       { s-identifier | string-literal:l => (coerce `(#\" ,@l #\") 'string)}:a => (concatenate 'string q e a);
+(defmethod o-host-lang-atom ((o ometa-parser))
+  (let ((q (core-apply o 'o-host-lang-quote)))
+    (let ((e (core-apply o 'o-host-lang-expand)))
+      (let ((a (core-or o
+                        (lambda ()
+                          (core-apply o 's-identifier))
+                        (lambda ()
+                          (let ((l (core-apply o 'o-string-literal)))
+                            (coerce `(#\" ,@l #\") 'string))))))
+        (concatenate 'string q e a)))))
+
+;; s-identifier = {~{space | ';' | '(' | ')' | '}' | '{' | '|' } char:c => c}+:xs spaces 
+;;                => (coerce xs 'string);
+(defmethod s-identifier ((o ometa-parser))
+  (let ((xs 
+         (core-many1 o 
+                     (lambda ()
+                       (core-not o 
+                                 (lambda ()
+                                   (core-or o
+                                            (lambda ()
+                                              (core-apply o 'o-space))
+                                            (lambda ()
+                                              (core-apply-with-args o 'o-exactly #\;))
+                                            (lambda ()
+                                              (core-apply-with-args o 'o-exactly #\())
+                                            (lambda ()
+                                              (core-apply-with-args o 'o-exactly #\)))
+                                            (lambda ()
+                                              (core-apply-with-args o 'o-exactly #\}))
+                                            (lambda ()
+                                              (core-apply-with-args o 'o-exactly #\{))
+                                            (lambda ()
+                                              (core-apply-with-args o 'o-exactly #\|)))))
+                       (core-apply o 'o-char)))))
+    (core-apply o 'o-spaces)
+    (coerce xs 'string)))
+                          
 
 ;; prod-app = "<" identifier:p ">" 
 ;;                => `(apply ,p)
@@ -311,7 +400,7 @@
                  `(apply-with-args ,p (arguments ,@args)))))
            (lambda ()
              (core-apply-with-args o 'o-seq-s '(#\^))
-             `(apply-super-with-args ,(ometa-current-rule o) (arguments)))
+             `(apply-super ,(ometa-current-rule o)))
            (lambda ()
              (core-apply-with-args o 'o-seq-s '(#\> #\^))
              (let ((args (core-apply o 'o-prod-arg-list)))
@@ -324,7 +413,7 @@
 
 ;;  prod-arg-list  = prod-arg:x {"," prod-arg:a => a}*:xs => (cons x xs);
 (defmethod o-prod-arg-list ((o ometa-parser))
-  (let ((x (core-apply 'o-prod-arg)))
+  (let ((x (core-apply o 'o-prod-arg)))
     (let ((xs (core-many o
                          (lambda ()
                            (core-apply-with-args o 'o-seq-s '(#\,))
@@ -383,7 +472,7 @@
                                               (lambda ()
                                                 (core-apply-with-args o 'o-exactly #\")))
                                     (core-apply o 'o-char)))))))
-    (core-apply-with-args o 'o-exactly #\")
+    (core-apply-with-args o 'o-seq-s '(#\"))
     `(apply-with-args o-seq-s (arguments ,(coerce cs 'string)))))
 
 ;;  string-literal = '``' {~'``' char:c => c}*:cs "''" => (exactly ,(coerce cs 'string));
@@ -437,6 +526,28 @@
   
 
 
+;; test1 = regra1 "K" => 1
+;;       | regra1 "R" => 2
+;;
+;; regra1 = "xyz";
+
+(defmethod test1 ((o ometa-parser))
+  (core-or o
+           (lambda ()
+             (core-apply o 'regra1)
+             (core-apply-with-args o 'o-exactly #\K)
+             1)
+           (lambda ()
+             (core-apply o 'regra1)
+             (core-apply-with-args o 'o-exactly #\R)
+             2)))
+
+(defmethod regra1 ((o ometa-parser))
+  (core-apply-with-args o 'o-seq '(#\x #\y #\z)))
+
+;; (defmethod regra2 ((o ometa-parser))
+;;   (core-apply-with-args o 'o-seq '(#\y)))
+
 
 (defun ometa-match (input rule)
   (let* ((o (make-instance 'ometa-parser :input (make-ometa-stream input))))
@@ -444,6 +555,8 @@
                             o-rule-rest o-rule-name o-argument o-choices o-choice
                             o-top-expression o-bind-expression o-repeated-expression
                             o-term o-binding o-element o-data-element o-action
+                            o-host-lang-expr o-host-lang-quote o-host-lang-expand
+                            o-host-lang-s-expr o-host-lang-atom s-identifier
                             o-prod-app o-prod o-prod-arg-list o-prod-arg
                             o-char-sequence o-cha-sequence-s o-string-literal
                             o-symbol o-s-expr o-la-prefix o-not-prefix o-sem-prefix
@@ -452,3 +565,4 @@
            (if (ometa-errorp res)
                (cons 'error (ometa-reporting o))
                res))))
+
