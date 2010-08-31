@@ -11,6 +11,7 @@
   :components ((:module "src"
                 :serial t
                 :components ((:file "packages")
+                             (:file "ometa-translator")
                              (:file "ometa-parser")
                              (:file "ometa-base")
                              (:file "stream")

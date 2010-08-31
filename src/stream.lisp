@@ -27,13 +27,34 @@
 (defmethod stream-memoize ((s ometa-stream) rule next res)
   (setf (gethash rule (stream-memo s)) (make-instance 'stream-memo :next next :result res)))
 
-;public
-;TODO: polimorph/generalize on seq (string, form, etc..). 'char' is specific of string
+
+(defgeneric s-first (s))
+(defgeneric s-size (s))
+
+(defmethod s-first ((s string))
+  (char s 0))
+
+(defmethod s-first ((c cons))
+  (car c))
+
+(defmethod s-size ((s string))
+  (array-total-size s))
+
+(defmethod s-size ((c cons))
+  (length c))
+
+(defmethod s-index ((s string) idx)
+  (aref s idx))
+
+(defmethod s-index ((c cons) idx)
+  (nth idx c))
+
+
 (defmethod make-ometa-stream (seq)
   (make-instance 'ometa-stream 
                  :input seq
                  :idx 0
-                 :head (char seq 0)))
+                 :head (s-first seq)))
 
 (defmethod make-ometa-stream-with (head (s ometa-stream))
   (make-instance 'ometa-stream
@@ -44,13 +65,13 @@
                  
 
 ;private
-(defun new-ometa-stream (str idx)
-  (if (>= idx (array-total-size str))
-      (make-instance 'ometa-stream-end :input str :idx (array-total-size str))
+(defun new-ometa-stream (lst idx)
+  (if (>= idx (s-size lst))
+      (make-instance 'ometa-stream-end :input lst :idx (s-size lst))
       (make-instance 'ometa-stream
-                     :input str
+                     :input lst
                      :idx idx
-                     :head (char str idx))))
+                     :head (s-index lst idx))))
 
 (defmethod stream-tail ((s ometa-stream))
   (if (not (null (slot-value s 'tail)))
@@ -61,7 +82,7 @@
       
 
 (defmethod stream-length ((s ometa-stream))
-  (array-total-size (stream-input s)))
+  (s-size (stream-input s)))
 
 (defmethod stream-current-phrase ((s ometa-stream))
   (let* ((begin (stream-index s))
@@ -72,19 +93,3 @@
                  (subseq (stream-input s) begin (if (< left 10) len (+ begin 10)))
                  "'")))
 
-
-;; (defun test-slots (s)
-;;   (list (slot-value s 'head)
-;;         (slot-value s 'idx)
-;;         (slot-value s 'input)
-;;         (slot-value s 'tail)))
-;; (setf a (make-ometa-stream "abc"))
-;; (setf b (stream-tail a))
-;; (setf c (stream-tail b))
-;; (setf d (stream-tail c))
-
-;; (test-slots a)
-;; (test-slots b)
-;; (test-slots c)
-;; (test-slots d)
-;; (funcall #'stream-tail a) 
