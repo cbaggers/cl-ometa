@@ -6,7 +6,7 @@
 (defsystem :cl-ometa
   :name "cl-ometa"
   :author "Thago Silva <thiago@comum.org>"
-  :description "A Common Lisp OMeta implementation"
+  :description "A Common Lisp implementation of OMeta"
   :license "MIT"
   :components ((:module "src"
                 :serial t
