@@ -1,0 +1,10 @@
+(defun str-trim (str)
+  (string-trim '(#\Space #\Tab #\Newline) str))
+
+(defun list->hash-table (lst)
+  (let ((h (make-hash-table)))
+    (dolist (l lst)
+      (let ((rname (car l))
+            (vars (cdr l)))
+        (setf (gethash rname h) vars)))
+    h))

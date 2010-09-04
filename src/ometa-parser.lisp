@@ -5,8 +5,10 @@
                     :accessor ometa-local-variables)))
 
 (defmethod ometa-add-local-var ((o ometa-parser) var)
-  (let ((rule (ometa-current-rule o)))
-    (push var (gethash rule (ometa-local-variables o)))))
+  (let* ((rule (ometa-current-rule o))
+         (vars (gethash rule (ometa-local-variables o))))
+    (unless (find var vars)
+      (push var (gethash rule (ometa-local-variables o))))))
 
 (defmethod ometa-local-variables-list ((o ometa-parser))
   (let ((res nil))
@@ -28,7 +30,7 @@
                             (core-apply o 'anything)))
              (core-apply-with-args o 'seq '(#\* #\/)))
            (lambda ()
-             (call-next-method))))
+             (call-next-method o))))
 
 ;;   ometa = spaces "ometa" identifier:name inheritance:i "{" rules:r "}" $
 ;;            => `(grammar ,name ,i ,@r);
@@ -53,7 +55,7 @@
      (let ((i (core-apply o 'identifier)))
        `(parent ,i)))
    (lambda ()
-     `(parent "OMeta"))))
+     `(parent ometa-base))))
     
 
 ;;   rules  = rule+;
@@ -421,7 +423,7 @@
                          (lambda ()
                            (core-apply-with-args o 'seq-s '(#\,))
                            (core-apply o 'prod-arg)))))
-      `(cons x xs))))
+      (cons x xs))))
 
 
                    
@@ -431,8 +433,6 @@
   (core-or o
            (lambda () (core-apply o 'data-element))
            (lambda () (core-apply o 'identifier))))
-
-                   
 
 
 
@@ -476,7 +476,9 @@
                                                 (core-apply-with-args o 'exactly #\")))
                                     (core-apply o 'chr)))))))
     (core-apply-with-args o 'seq-s '(#\"))
-    `(apply-with-args seq-s (arguments ,(coerce cs 'string)))))
+    `(and (seq ,(coerce cs 'string))
+          (apply spaces))))
+
 
 ;;  string-literal = '``' {~'``' char:c => c}*:cs "''" => (exactly ,(coerce cs 'string));
 (defmethod string-literal ((o ometa-parser))
@@ -529,43 +531,20 @@
   
 
 
-;; test1 = regra1 "K" => 1
-;;       | regra1 "R" => 2
-;;
-;; regra1 = "xyz";
-
-(defmethod test1 ((o ometa-parser))
-  (core-or o
-           (lambda ()
-             (core-apply o 'regra1)
-             (core-apply-with-args o 'exactly #\K)
-             1)
-           (lambda ()
-             (core-apply o 'regra1)
-             (core-apply-with-args o 'exactly #\R)
-             2)))
-
-(defmethod regra1 ((o ometa-parser))
-  (core-apply-with-args o 'seq '(#\x #\y #\z)))
-
-;; (defmethod regra2 ((o ometa-parser))
-;;   (core-apply-with-args o 'seq '(#\y)))
-
-
-(defun ometa-match (input rule)
-  (let* ((o (make-instance 'ometa-parser :input (make-ometa-stream input))))
-    (setf (ometa-rules o) '(ometa inheritance rules rule rule-part
-                            rule-rest rule-name argument choices choice
-                            top-expression bind-expression repeated-expression
-                            term binding element data-element action
-                            host-lang-expr host-lang-quote host-lang-expand
-                            host-lang-s-expr host-lang-atom s-identifier
-                            prod-app prod prod-arg-list prod-arg
-                            char-sequence cha-sequence-s string-literal
-                            asymbol s-expr la-prefix not-prefix sem-prefix
-                            end-symb any-symb))
-         (let ((res (catch 'ometa (core-apply o rule))))
-           (if (ometa-error-p res)
-               (cons 'error (ometa-reporting o))
-               res))))
+;; (defun ometa-match (input rule)
+;;   (let* ((o (make-instance 'ometa-parser :input (make-ometa-stream input))))
+;;     (setf (ometa-rules o) '(ometa inheritance rules rule rule-part
+;;                             rule-rest rule-name argument choices choice
+;;                             top-expression bind-expression repeated-expression
+;;                             term binding element data-element action
+;;                             host-lang-expr host-lang-quote host-lang-expand
+;;                             host-lang-s-expr host-lang-atom s-identifier
+;;                             prod-app prod prod-arg-list prod-arg
+;;                             char-sequence cha-sequence-s string-literal
+;;                             asymbol s-expr la-prefix not-prefix sem-prefix
+;;                             end-symb any-symb))
+;;          (let ((res (catch 'ometa (core-apply o rule))))
+;;            (if (ometa-error-p res)
+;;                (cons 'error (ometa-reporting o))
+;;                res))))
 

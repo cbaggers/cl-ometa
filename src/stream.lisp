@@ -37,11 +37,15 @@
 (defmethod s-first ((c cons))
   (car c))
 
+(defmethod s-first ((n null))  n)
+
 (defmethod s-size ((s string))
   (array-total-size s))
 
 (defmethod s-size ((c cons))
   (length c))
+
+(defmethod s-size ((n null)) 0)
 
 (defmethod s-index ((s string) idx)
   (aref s idx))
@@ -49,12 +53,15 @@
 (defmethod s-index ((c cons) idx)
   (nth idx c))
 
+;; is there a need for s-index((n null))?
 
 (defmethod make-ometa-stream (seq)
-  (make-instance 'ometa-stream 
-                 :input seq
-                 :idx 0
-                 :head (s-first seq)))
+  (if (eq seq nil)
+      (make-instance 'ometa-stream-end :input seq :idx 0)
+      (make-instance 'ometa-stream 
+                     :input seq
+                     :idx 0
+                     :head (s-first seq))))
 
 (defmethod make-ometa-stream-with (head (s ometa-stream))
   (make-instance 'ometa-stream

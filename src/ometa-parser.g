@@ -1,33 +1,31 @@
-ometa OMetaParser {
-  space = '/*' { ~'*/' _ }* '*/'
-        | ^
-        ;
+ometa op {
+
+  spacing = '/*' { ~'*/' _ }* '*/'
+          | ^
+          ;
 
   ometa = spaces "ometa" identifier:name inheritance:i "{" rules:r "}" $
-           => `(grammar ,name ,i
-                  (locals ,@(send self 'locals-ast))
-                   ,@r);
+          => `(grammar ,name ,i (locals ,(ometa-local-variables-list o)) ,@r);
 
 
-  inheritance = "<:" identifier:i => `(inherit-from ,i)
-              |                     => `(inherit-from OMeta)
+  inheritance = "<:" identifier:i => `(parent ,i)
+              |                   => `(parent OMeta)
               ;
 
   rules = rule+;
 
-  rule = &{rule-name:rname} <rule-part rname>+:p => `(rule ,rname (or ,@p));
+  rule = &{rule-name:rname} <rule-part rname>+:p => `(rule ,rname, `(or ,@p));
 
-  rule-part :rn = rule-name:rname %(equal? rname rn) rule-rest:r ";" => r;
+  rule-part :rn = rule-name:rname %(eq rname rn) rule-rest:r ";" => r;
 
-  rule-rest = "::=" choices
+  rule-rest = "=" choices
             |  action
-            |  argument+:args "::=" choices:c => `(and ,@args ,c)
+            |  argument+:args "=" choices:c => `(and ,@args ,c)
             |  argument+:args  action:ac      => `(and ,@args ,ac)
             ;
 
 
-  rule-name =  identifier:rname 
-               => (begin (.set state-self 'current-rule rname) rname)
+  rule-name =  identifier:rname  => (progn (setf (ometa-current-rule o) rname) rname)
             ;
 
 
@@ -48,9 +46,9 @@ ometa OMetaParser {
   bind-expression = repeated-expression:e binding:b => `(bind ,b ,e)
                   ;
 
-  repeated-expression = term:t "*" => `(many ,t)
-                      |    term:t "+" => `(many1 ,t)
-                      |    term:t "?" => `(optional ,t)
+  repeated-expression = term:e "*" => `(many ,e)
+                      |    term:e "+" => `(many1 ,e)
+                      |    term:e "?" => `(optional ,e)
                       |    term
                       ;
 
@@ -59,7 +57,7 @@ ometa OMetaParser {
         |  element
         ;
 
-  binding = ':' identifier:i => (begin (send self 'add-local i) i)
+  binding = ':' identifier:i => (progn (ometa-add-local-var o i) i)
           ;
 
   element = prod-app
@@ -80,78 +78,72 @@ ometa OMetaParser {
   action     = "=>" host-lang-expr:s => `(action ,s);
 
 
-  host-lang-expr   = host-lang-quote:q 
-                     host-lang-expand:e 
-                     host-lang-s-expr:s 
-                     => (string-trim (string-append q e s));
+  host-lang-expr  = host-lang-quote:q 
+                    host-lang-expand:e 
+                    host-lang-s-expr:s 
+                    => (str-trim  (concatenate 'string q e s))
+                   ;
 
-  host-lang-quote   = {'`'+:q => (list->string q) 
-                       | '\''+:q => (list->string q) 
-                       | => (string)};
+  host-lang-quote   = {'`'+:q => (coerce q 'string)
+                       | '\''+:q => (coerce q 'string)
+                       | => ""};
 
-  host-lang-expand  = {','+:q => (list->string q) 
-                       | => (string)}:qq  
+  host-lang-expand  = {','+:q => (concatenate 'string q) 
+                       | => ""}:qq  
                       {'@':a => (string a) 
-                       | => (string)}:aa => (string-append qq aa);
+                       | => ""}:aa => (concatenate 'string qq aa)
+                    ;
 
   host-lang-s-expr  = host-lang-atom
                      |  "(" { host-lang-atom | host-lang-expr }*:x ")"
-                           =>  (string-append "(" (strings-join x " ") ")")
+                           =>  (concatenate 'string "(" (reduce (lambda (a b) (concatenate 'string a " " b)) x) ")")
                      ;
 
   host-lang-atom    = host-lang-quote:q host-lang-expand:e 
                       {   s-identifier 
                         | string-literal:l 
-                          => (list->string `(#\" ,@l #\"))
-                       }:a  => (string-append q e a);
+                          => (coerce `(#\" ,@l #\") 'string)
+                       }:a  => (concatenate 'string q e a);
 
-  s-identifier = {~{space | ';' | '(' | ')' | '}' | '{' | '|' } 
-                 char:c => c}+:xs spaces  => (list->string xs);
+  s-identifier = {~{spacing | ';' | '(' | ')' | '}' | '{' | '|' } 
+                 chr:c => c}+:xs spaces  => (coerce xs 'string);
 
 
   prod-app = "<" identifier:p ">" 
                  => `(apply ,p)
             |  identifier:p
                  => `(apply ,p)
+            | "<" identifier:p prod-arg-list:args ">"
+                => `(apply-with-args ,p (arguments ,@args))
+            | "^"
+                => `(apply-super ,(ometa-current-rule o))
+            | "<^" prod-arg-list:args ">"
+                => `(apply-super-with-args ,(ometa-current-rule o) (arguments ,@args))
             ;
 
-  prod-app = "<" identifier:p prod-arg-list:args ">" 
-                 => `(apply-w-args ,p (arguments ,@args))
-            ;
+  prod-arg-list = prod-arg:x {"," prod-arg:a => a}*:xs => (cons x xs);
 
-  prod-app = "^"
-              => `(apply-super-w-args ,(.get self 'current-rule) (arguments))
-            |  "<^" prod-arg-list:args ">"
-              => `(apply-super-w-args ,(.get self 'current-rule) (arguments ,@args))
-            ;
+  prod-arg = data-element | identifier;
 
-  prod-arg-list  = prod-arg:x {"," prod-arg:a => a}*:xs => (cons x xs);
+ char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' chr:c => c}+:cs "'" 
+                     => `(seq ,(coerce cs 'string));
 
-  prod-arg       = data-element | identifier
-                 ;
+ char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  chr:c => c}*:cs "\"" => `(and 
+                                                                                    (seq ,(coerce cs 'string))
+                                                                                    (apply spaces));
 
+  string-literal = '``' {~'``' char:c => c}*:cs "''" => `(exactly ,(coerce cs 'string));
 
-  char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' char:c => c}+:cs "'" 
-                      => `(seq ,(list->string cs));
+ symbol     =  '#' identifier:s => `(symbol ,s);
 
-  char-sequence-s = '"' { '\\' '"' 
-                         | '\\' '\\' 
-                         | ~'"'  char:c => c
-                        }*:cs "\"" 
-                          => `(and (seq ,(list->string cs))
-                                   (apply spaces));
+ s-expr    =  "(" choice:s ")" => `(form ,s);
 
-  string-literal = '``' {~'``' char:c => c}*:cs "''" 
-                     => (exactly ,(list->string cs));
+ la-prefix    = "&";
 
-  symbol     =  '#' identifier:t => `(symbol ,t);
-
-  s-expr     =  "(" choice:s ")" => `(form ,s);
+not-prefix     = "~";
+sem-prefix     = "%";
+end-symb       = "$" => `(apply end);
+any-symb       = "_" => `(apply anything);
 
 
-  la-prefix      = "&";
-  not-prefix     = "~";
-  sem-prefix     = "%";
-  end-symb       = "$" => `(apply end);
-  any-symb       = "_" => `(apply anything);
 }

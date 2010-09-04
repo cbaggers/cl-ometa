@@ -50,6 +50,14 @@
   (stream-head (ometa-input o)))
 
 
+(defun ometa-match (data grammar rule)
+  (let ((o (make-instance grammar :input (make-ometa-stream data))))
+    (let ((res (catch 'ometa (core-apply o rule))))
+      (if (ometa-error-p res)
+          (cons 'error (ometa-reporting o))
+          res))))
+
+
 
 ;; core functions
 ;; unmemoized-version
@@ -170,6 +178,11 @@
 (defmethod core-prepend-input ((o ometa-base) value)
   (setf (ometa-input o) 
         (make-ometa-stream-with value (ometa-input o))))
+
+;; (defmethod core-prepend-input-list ((o ometa-base) lst)
+;;   (dolist (value lst)  
+;;     (setf (ometa-input o) 
+;;           (make-ometa-stream-with value (ometa-input o)))))
 
 ;; pred anything
 (defmethod core-pred ((o ometa-base) x)
@@ -294,7 +307,7 @@
     r))
 
 (defmethod str ((o ometa-base))
-  (let ((r (core-apply o 'anyhting)))
+  (let ((r (core-apply o 'anything)))
     (core-pred o (stringp r))
     r))
 
@@ -367,4 +380,5 @@
 (defmethod identifier ((o ometa-base))
   (let ((ret (core-apply o 'token)))
     (core-apply o 'spaces)
-    ret))
+    (let ((min (string-upcase ret)))
+      (intern min))))

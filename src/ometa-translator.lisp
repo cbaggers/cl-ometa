@@ -1,8 +1,8 @@
-(defclass ometa-translator (ometa-base) ((grammar-name :accessor grammar-name)))
+(defclass ometa-translator (ometa-base) 
+  ((grammar-name :accessor grammar-name
+                 :initform nil)
+   (local-variables  :accessor ometa-local-variables)))
 
-
-(defun make-hash-from-list (lst) ;;make hash in the form ((key val) (key val) (key val))
-  (throw 'todo lst))
 
 ;;   ometa ::= #grammar { atom:name => (.set state-self 'grammar-name name) }
 ;;                inheritance:i
@@ -22,31 +22,37 @@
     (core-apply o 'locals)
     (let ((r (core-apply o 'rules)))
       (let* ((gname (grammar-name o)))
-        `((defclass ,gname (,i) nil)
-          ,@r)))))
+        (format nil "~a~%~%~{~w~^ ~% ~}" `(defclass ,gname (,i) nil) r)))))
 
 ;;   inheritance ::= (#inherit-from atom:i) => i
 ;;               ;
 (defmethod inheritance ((o ometa-translator))
   (core-form o
              (lambda ()
-               (core-apply-with-args o 'exactly 'inherit-from)
-               (core-apply o 'str))))
+               (core-apply-with-args o 'exactly 'parent)
+               (core-apply o 'an-atom))))
 
-;;   locals ::= (#locals (atom:rname atom+:vars => `(,rname ,@vars) )* ):lst
+;;   locals ::= (#locals ( (atom:rname (atom+:vars))* )) => `(,rname ,@vars) )* ):lst
 ;;                => (.set state-self 'locals (list->table lst));
+
 (defmethod locals ((o ometa-translator))
   (let ((lst (core-form o
                         (lambda ()
                           (core-apply-with-args o 'exactly 'locals)
                           (core-form o
                                      (lambda ()
-                                       (let ((rname (core-apply o 'an-atom)))
-                                         (let ((vars (core-many1 o
-                                                                 (lambda ()
-                                                                   (core-apply o 'an-atom)))))
-                                           `(,rname ,@vars)))))))))
-    `(setf (local-variables o) (make-hash-from-list ,@lst))))
+                                       (core-many o
+                                                  (lambda ()
+                                                    (core-form o
+                                                               (lambda ()
+                                                                 (let ((rname (core-apply o 'an-atom)))
+                                                                   (let ((vars (core-form o
+                                                                                          (lambda ()
+                                                                                            (core-many1 o
+                                                                                                        (lambda ()
+                                                                                                          (core-apply o 'an-atom)))))))
+                                                                     `(,rname ,@vars)))))))))))))
+    (setf (ometa-local-variables o) (list->hash-table lst))))
 
 ;;   rules ::=  rule+;
 (defmethod rules ((o ometa-translator))
@@ -72,12 +78,12 @@
 (defmethod rule ((o ometa-translator))
   (core-form o
              (lambda ()
-               (core-apply-with-args o 'o-exactly 'rule)
+               (core-apply-with-args o 'exactly 'rule)
                (let ((rname (core-apply o 'an-atom)))
                  (let ((p (core-apply o 'choice)))
                    (let ((locals (gethash rname (ometa-local-variables o))))
                      `(defmethod ,rname ((o ,(grammar-name o)))
-                        ,(if (null locals) p `(let ,(map 'string (lambda (x) (list x ''())) locals) ,p)))))))))
+                        ,(if (null locals) p `(let ,(map 'cons (lambda (x) (list x nil)) locals) ,p)))))))))
                       
 ;;   choice ::= (#and choice+:p) => `(begin ,@p)
 ;;            | (#and)           => ''()
@@ -91,7 +97,7 @@
                         (lambda ()
                           (core-apply-with-args o 'exactly 'and)
                           (let ((p (core-many1 o (lambda () (core-apply o 'choice)))))
-                            `(begin ,@p)))))
+                            `(progn ,@p)))))
            (lambda ()
              (core-form o (lambda () (core-apply-with-args o 'exactly 'and)))
              ''())
@@ -121,7 +127,7 @@
              (core-form o
                         (lambda ()
                           (core-apply-with-args o 'exactly 'action)
-                          (let ((ac (core-apply o 'string)))
+                          (let ((ac (core-apply o 'str)))
                             (read-from-string ac)))))
            (lambda ()
              (core-apply o 'expression))))
@@ -139,14 +145,16 @@
 ;;               |  predicate
 ;;               |  lookahead-operation
 ;;               ;
-(defmethod o-expression ((o ometa-translator))
+(defmethod expression ((o ometa-translator))
   (core-or o
            (lambda ()
              (core-apply o 'apply-operation))
            (lambda ()
              (core-apply o 'apply-with-args-operation))
+           ;; (lambda ()
+           ;;   (core-apply o 'apply-super-with-args-operation))
            (lambda ()
-             (core-apply o 'apply-super-with-args-operation))
+             (core-apply o 'apply-super-operation))
            (lambda ()
              (core-apply o 'seq-operation))
            (lambda ()
@@ -173,19 +181,27 @@
              (lambda ()
                (core-apply-with-args o 'exactly 'apply)
                (let ((s (core-apply o 'an-atom)))
-                 `(core-apply o ,s)))))
+                 `(core-apply o ',s)))))
+
+;; apply-super ::= (#apply-super atom:x) => `(core-apply-super o x)
+ (defmethod apply-super-operation ((o ometa-translator))
+   (core-form o
+              (lambda ()
+                (core-apply-with-args o 'exactly 'apply-super)
+                (let ((r (core-apply o 'an-atom)))
+                  `(call-next-method o)))))
 
 ;;   apply-w-args-operation ::= (#apply-w-args atom:r (#arguments {atom | (#symbol atom:k => `',k)}*:a)) 
 ;;                                => `(send self 'apply-with-args ',r ,@a)
 ;;                                ;
-(defmethod o-apply-with-args ((o ometa-translator))
+(defmethod apply-with-args-operation ((o ometa-translator))
   (core-form o
              (lambda ()
                (core-apply-with-args o 'exactly 'apply-with-args)
                (let ((r (core-apply o 'an-atom)))
                  (core-form o
                             (lambda ()
-                              (core-apply-with-args o 'o-exactly 'arguments)
+                              (core-apply-with-args o 'exactly 'arguments)
                               (let ((a (core-many o
                                                   (lambda ()
                                                     (core-or o
@@ -202,24 +218,24 @@
 ;;   apply-super-w-args-operation ::= (#apply-super-w-args atom:r (#arguments {atom | (#symbol atom:k => `',k)}*:a))
 ;;                                    => `(send self 'super ',r ,@a)
 ;;                                 ;
-(defmethod apply-super-with-args-operation ((o ometa-translator))
-  (core-form o
-             (lambda ()
-               (core-apply-with-args o 'exactly 'apply-super-with-args)
-               (let ((r (core-apply o 'an-atom)))
-                 (core-form o
-                            (lambda ()
-                              (core-apply-with-args o 'exactly 'arguments)
-                              (let ((a (core-many o
-                                                  (lambda ()
-                                                    (core-or o
-                                                             (lambda ()
-                                                               (core-apply o 'an-atom))
-                                                             (lambda ()
-                                                               (core-apply-with-args o 'exactly 'symbol)
-                                                               (let ((k (core-apply o 'an-atom)))
-                                                                 `',k)))))))
-                                `(core-apply-super o ,r ,@a))))))))
+;; (defmethod apply-super-with-args-operation ((o ometa-translator))
+;;   (core-form o
+;;              (lambda ()
+;;                (core-apply-with-args o 'exactly 'apply-super-with-args)
+;;                (let ((r (core-apply o 'an-atom)))
+;;                  (core-form o
+;;                             (lambda ()
+;;                               (core-apply-with-args o 'exactly 'arguments)
+;;                               (let ((a (core-many o
+;;                                                   (lambda ()
+;;                                                     (core-or o
+;;                                                              (lambda ()
+;;                                                                (core-apply o 'an-atom))
+;;                                                              (lambda ()
+;;                                                                (core-apply-with-args o 'exactly 'symbol)
+;;                                                                (let ((k (core-apply o 'an-atom)))
+;;                                                                  `',k)))))))
+;;                                 `(core-apply-super o ',r ,@a))))))))
 
 ;;   seq-operation   ::= (#seq string:s) => (if (eq? (string-length s) 1)
 ;;                                             `(send self 'apply-with-args 'exactly ',(string-ref s 0))
@@ -230,8 +246,8 @@
                (core-apply-with-args o 'exactly 'seq)
                (let ((s (core-apply o 'str)))
                  (if (eq (array-total-size s) 1)
-                     `(core-apply-with-args o 'exactly ',(aref s 0))
-                     `(core-apply-with-args o 'seq ,(concatenate 'list s)))))))
+                     `(core-apply-with-args o 'exactly ,(aref s 0))
+                     `(core-apply-with-args o 'seq ',(concatenate 'list s)))))))
 
 ;;   many-operation ::= (#many choice:x) => (if (list? (car x))
 ;;                                                             `(send self 'many (lambda () ,@x))
@@ -275,7 +291,7 @@
   (core-form o 
              (lambda ()
                (core-apply-with-args o 'exactly 'lookahead)
-               (let ((x (core-apply o 'choic)))
+               (let ((x (core-apply o 'choice)))
                  (if (listp (car x))
                      `(core-lookahead o (lambda () ,@x))
                      `(core-lookahead o (lambda () ,x)))))))
@@ -314,13 +330,8 @@
              (lambda ()
                (core-apply-with-args o 'exactly 'sem-predicate)
                (let ((s (core-apply o 'str)))
-                 `(core-pred ,(read-from-string s))))))
+                 `(core-pred o ,(read-from-string s))))))
 
-;;   string  ::= _:s => (begin (send self 'pred (string? s)) s);
-(defmethod str ((o ometa-translator))
-  (let ((s (core-apply o 'anything)))
-    (progn
-      (core-pred o (stringp s)) s)))
 
 ;;   atom    ::= _:a => (begin (send self 'pred (symbol? a)) a);
 (defmethod an-atom ((o ometa-translator))
@@ -329,9 +340,10 @@
       (core-pred o (symbolp a)) a)))
 
 
-(defmethod ometa-translate (input rule)
-  (let* ((o (make-instance 'ometa-translator :input (make-ometa-stream input))))
-    (let ((res (catch 'ometa (core-apply o rule))))
-      (if (ometa-error-p res)
-          (cons 'error (ometa-reporting o))
-          res))))
+
+;; (defmethod ometa-translate (input rule)
+;;   (let* ((o (make-instance 'ometa-translator :input (make-ometa-stream input))))
+;;     (let ((res (catch 'ometa (core-apply o rule))))
+;;       (if (ometa-error-p res)
+;;           (cons 'error (ometa-reporting o))
+;;           res))))
