@@ -487,12 +487,14 @@
                             (progn
                              (core-apply-with-args o 'exactly #\))
                              (core-apply o 'spaces))
-                            (concatenate 'string " ("
-                                         (reduce
-                                          (lambda (a b)
-                                            (concatenate 'string a " " b))
-                                          x)
-                                         ") ")))))))) 
+                            (if x
+                                (concatenate 'string " ("
+                                             (reduce
+                                              (lambda (a b)
+                                                (concatenate 'string a " " b))
+                                              x)
+                                             ") ")
+                                "")))))))) 
  (defmethod host-lang-atom ((o ometa-parser))
    (let ((a nil) (l nil) (e nil) (q nil))
      (core-or o

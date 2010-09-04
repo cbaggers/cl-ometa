@@ -1,10 +1,14 @@
 ometa ometa-parser {
 
+    /* current-rule and local-variables slots */
+
   _slots ((current-rule    :initform nil 
            :accessor ometa-current-rule)
           (local-variables :initform (make-hash-table)
            :accessor ometa-local-variables));
 
+
+  /* useful rules for controling var bindings and acessing grammar variables */
 
   _inline [(defmethod ometa-add-local-var ((o ometa-parser) var)
             (let* ((rule (ometa-current-rule o))
@@ -127,7 +131,8 @@ ometa ometa-parser {
 
   host-lang-s-expr  = host-lang-atom
                      |  "(" { host-lang-atom | host-lang-expr }*:x ")"
-                           =>  (concatenate 'string "(" (reduce (lambda (a b) (concatenate 'string a " " b)) x) ")")
+                           =>  (if x (concatenate 'string "(" (reduce (lambda (a b) (concatenate 'string a " " b)) x) ")")
+                                     "")
                      ;
 
   host-lang-atom    = host-lang-quote:q host-lang-expand:e 
@@ -156,25 +161,24 @@ ometa ometa-parser {
 
   prod-arg = data-element | identifier;
 
- char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' chr:c => c}+:cs "'" 
+  char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' chr:c => c}+:cs "'" 
                      => `(seq ,(coerce cs 'string));
 
- char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  chr:c => c}*:cs "\"" => `(and 
+  char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  chr:c => c}*:cs "\"" => `(and 
                                                                                     (seq ,(coerce cs 'string))
                                                                                     (apply spaces));
 
   string-literal = '``' {~'``' char:c => c}*:cs "''" => `(exactly ,(coerce cs 'string));
 
- asymbol     =  '#' identifier:s => `(symbol ,s);
+  asymbol     =  '#' identifier:s => `(symbol ,s);
 
- s-expr    =  "(" choice:s ")" => `(form ,s);
+  s-expr    =  "(" choice:s ")" => `(form ,s);
 
- la-prefix    = "&";
+  la-prefix    = "&";
 
-not-prefix     = "~";
-sem-prefix     = "%";
-end-symb       = "$" => `(apply end);
-any-symb       = "_" => `(apply anything);
-
+  not-prefix     = "~";
+  sem-prefix     = "%";
+  end-symb       = "$" => `(apply end);
+  any-symb       = "_" => `(apply anything);
 
 }
