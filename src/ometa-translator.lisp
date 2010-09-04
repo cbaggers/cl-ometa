@@ -16,14 +16,27 @@
 ;;                                    ,gname)));
 (defmethod ometa ((o ometa-translator))
   (core-apply-with-args o 'exactly 'grammar)
+  (format t "match 'grammar'~%")
   (let ((name (core-apply o 'an-atom)))
     (setf (grammar-name o) name))
+  (format t "match gname~%")
   (let ((i (core-apply o 'inheritance)))
+    (format t "ok inheritance ~%")
     (core-apply o 'locals)
-    (let ((r (core-apply o 'rules)))
-      (let* ((gname (grammar-name o)))
-        (format nil "~a~%~%~{~w~^ ~% ~}" `(defclass ,gname (,i) nil) r)))))
+    (format t "ok locals ~%")
+    (let ((slots (core-apply o 'slots)))
+      (format t "ok slots ~%")
+      (let ((inline-code (core-apply o 'inline-code)))
+        (format t "ok inline ~%")
+        (let ((r (core-apply o 'rules)))
+          (format t "ok rules")
+          (let* ((gname (grammar-name o)))
+            (if inline-code
+                `((defclass ,gname (,i) ,slots) ,@inline-code ,@r)
+                `((defclass ,gname (,i) ,slots)  ,@r))))))))
+            ;(format nil "~a ~2% ~w ~{~w ~% ~}" `(defclass ,gname (,i) ,slots) inline-code r)))))))
 
+;; write-sequence
 ;;   inheritance ::= (#inherit-from atom:i) => i
 ;;               ;
 (defmethod inheritance ((o ometa-translator))
@@ -53,6 +66,26 @@
                                                                                                           (core-apply o 'an-atom)))))))
                                                                      `(,rname ,@vars)))))))))))))
     (setf (ometa-local-variables o) (list->hash-table lst))))
+
+(defmethod slots ((o ometa-translator))
+  (core-form o
+             (lambda () 
+               (core-apply-with-args o 'exactly 'slots)
+               (core-or o 
+                        (lambda () 
+                          (let ((s (core-apply o 'str)))
+                            (read-from-string s)))
+                        (lambda () nil)))))
+                                  
+(defmethod inline-code ((o ometa-translator))
+  (core-form o
+             (lambda ()
+               (core-apply-with-args o 'exactly 'inline)
+               (core-or o
+                        (lambda () 
+                          (let ((s (core-apply o 'str)))
+                            (read-all-from-string s)))
+                        (lambda () nil)))))
 
 ;;   rules ::=  rule+;
 (defmethod rules ((o ometa-translator))
@@ -188,8 +221,8 @@
    (core-form o
               (lambda ()
                 (core-apply-with-args o 'exactly 'apply-super)
-                (let ((r (core-apply o 'an-atom)))
-                  `(call-next-method o)))))
+                (core-apply o 'an-atom) ;; TODO: this is irrelevant
+                `(call-next-method o))))
 
 ;;   apply-w-args-operation ::= (#apply-w-args atom:r (#arguments {atom | (#symbol atom:k => `',k)}*:a)) 
 ;;                                => `(send self 'apply-with-args ',r ,@a)

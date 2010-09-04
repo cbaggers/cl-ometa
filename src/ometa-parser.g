@@ -1,15 +1,46 @@
-ometa op {
+ometa ometa-parser {
+
+  _slots ((current-rule    :initform nil 
+           :accessor ometa-current-rule)
+          (local-variables :initform (make-hash-table)
+           :accessor ometa-local-variables));
+
+
+  _inline [(defmethod ometa-add-local-var ((o ometa-parser) var)
+            (let* ((rule (ometa-current-rule o))
+                   (vars (gethash rule (ometa-local-variables o))))
+             (unless (find var vars)
+              (push var (gethash rule (ometa-local-variables o))))))
+           
+           (defmethod ometa-local-variables-list ((o ometa-parser))
+            (let ((res nil))
+             (maphash (lambda (k v) (setq res (cons (list k v) res))) (ometa-local-variables o))
+             res))];
 
   spacing = '/*' { ~'*/' _ }* '*/'
           | ^
           ;
 
-  ometa = spaces "ometa" identifier:name inheritance:i "{" rules:r "}" $
-          => `(grammar ,name ,i (locals ,(ometa-local-variables-list o)) ,@r);
+  ometa = spaces "ometa" identifier:name inheritance:i  "{" 
+              cl-slots:sl inline-code:ic 
+              rules:r 
+          "}" $
+          => `(grammar ,name ,i (locals ,(ometa-local-variables-list o))
+                                (slots ,sl)
+                                (inline ,ic)  ,@r);
 
 
   inheritance = "<:" identifier:i => `(parent ,i)
-              |                   => `(parent OMeta)
+              |                   => `(parent ometa-base)
+              ;
+
+
+  cl-slots    = "_slots" { ~';' _}*:s ";" => (concatenate 'string s)
+              |
+              ;
+
+  inline-code = "_inline" '[' { ~']' _}*:c ']' ";" => (concatenate 'string c)
+              |
               ;
 
   rules = rule+;
@@ -69,7 +100,7 @@ ometa op {
   data-element = char-sequence
                |  char-sequence-s
                |  string-literal
-               |  symbol
+               |  asymbol
                |  s-expr
                |  any-symb
                |  end-symb
@@ -134,7 +165,7 @@ ometa op {
 
   string-literal = '``' {~'``' char:c => c}*:cs "''" => `(exactly ,(coerce cs 'string));
 
- symbol     =  '#' identifier:s => `(symbol ,s);
+ asymbol     =  '#' identifier:s => `(symbol ,s);
 
  s-expr    =  "(" choice:s ")" => `(form ,s);
 

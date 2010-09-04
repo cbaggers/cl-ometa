@@ -1,550 +1,854 @@
-(defclass ometa-parser (ometa-base) 
-  ((current-rule    :initform nil 
-                    :accessor ometa-current-rule)
-   (local-variables :initform (make-hash-table)
-                    :accessor ometa-local-variables)))
-
-(defmethod ometa-add-local-var ((o ometa-parser) var)
-  (let* ((rule (ometa-current-rule o))
-         (vars (gethash rule (ometa-local-variables o))))
-    (unless (find var vars)
-      (push var (gethash rule (ometa-local-variables o))))))
-
-(defmethod ometa-local-variables-list ((o ometa-parser))
-  (let ((res nil))
-    (maphash (lambda (k v) (setq res (cons (list k v) res))) (ometa-local-variables o))
-    res))
-
-
-
-
-;;   space = '/*' { ~'*/' _}* '*/'
-;;         | ^
-;;         ;
-(defmethod spacing ((o ometa-parser))
-  (core-or o
-           (lambda () 
-             (core-apply-with-args o 'seq '(#\/ #\*))
-             (core-many o (lambda ()
-                            (core-not o (lambda () (core-apply-with-args o 'seq '(#\* #\/))))
-                            (core-apply o 'anything)))
-             (core-apply-with-args o 'seq '(#\* #\/)))
-           (lambda ()
-             (call-next-method o))))
-
-;;   ometa = spaces "ometa" identifier:name inheritance:i "{" rules:r "}" $
-;;            => `(grammar ,name ,i ,@r);
-(defmethod ometa ((o ometa-parser))
-  (core-apply o 'spaces)
-  (core-apply-with-args o 'seq-s '(#\o #\m #\e #\t #\a))
-  (let ((name (core-apply o 'identifier)))
-    (let ((i (core-apply o 'inheritance)))
-      (core-apply-with-args o 'seq-s '(#\{))
-      (let ((r (core-apply o 'rules)))
-        (core-apply-with-args o 'seq-s '(#\}))
-        (core-apply o 'end)
-        `(grammar ,name ,i (locals ,(ometa-local-variables-list o)) ,@r)))))
-
-;;   inheritance = "<:" identifier:i => `(parent ,i)
-;;               |                   => `(parent OMeta)
-;;               ;
-(defmethod inheritance ((o ometa-parser))
-  (core-or o
-   (lambda ()
-     (core-apply-with-args o 'seq-s '(#\< #\:))
-     (let ((i (core-apply o 'identifier)))
-       `(parent ,i)))
-   (lambda ()
-     `(parent ometa-base))))
-    
-
-;;   rules  = rule+;
-(defmethod rules ((o ometa-parser))
-  (core-many1 o
-   (lambda () (core-apply o 'rule))))
-
-;;  rule  = &{rule-name:rname} <rule-part rname>+:p => `(rule ,rname (or ,@p));
-(defmethod rule ((o ometa-parser))
-  (let ((rname (core-lookahead o (lambda () (core-apply o 'rule-name)))))
-    (let ((p (core-many1 o (lambda () (core-apply-with-args o 'rule-part rname)))))
-      `(rule ,rname, `(or ,@p)))))
-
-;;  rule-part :rn = rule-name:rname %(equal rname rn) rule-rest:r ";" => r;
-(defmethod rule-part ((o ometa-parser))
-  (let ((rn (core-apply o 'anything)))
-    (let ((rname (core-apply o 'rule-name)))
-      (core-pred o (equal rname rn))
-      (let ((r (core-apply o 'rule-rest)))
-        (core-apply-with-args o 'seq-s '(#\;))
-        r))))
-
-;; rule-rest = "=" choices
-;;           |  action
-;;           |  argument+:args "=" choices:c => `(and ,@args ,c)
-;;           |  argument+:args  action:ac      => `(and ,@args ,ac)
-;;           ;
-(defmethod rule-rest ((o ometa-parser))
-  (core-or o 
-           (lambda ()
-             (core-apply-with-args o 'seq-s '(#\=))
-             (core-apply o 'choices))
-            (lambda ()
-              (core-apply o 'action))
-           (lambda ()
-             (let ((args (core-many1 o (lambda () (core-apply o 'argument)))))
-               (core-apply-with-args o 'seq-s '(#\=))
-               (let ((c (core-apply o 'choices)))
-                 `(and ,@args ,c))))
-           (lambda ()
-             (let ((args (core-many1 o (lambda () (core-apply o 'argument)))))
-               (let ((ac (core-apply o 'action)))
-                 `(and ,@args ,ac))))))
-
-
-
-;; rule-name =  identifier:rname => (progn (setf (ometa-current-rule o) rname) rname)
-;;           ;
-(defmethod rule-name ((o ometa-parser))
-  (let ((rname (core-apply o 'identifier)))
-    (progn
-      (setf (ometa-current-rule o) rname)
-      rname)))
-
-;; argument = bind-expression
-;;          | binding:b       => `(bind ,b (apply anything))
-;;          ;
-(defmethod argument ((o ometa-parser))
-  (core-or o 
-           (lambda () 
-             (core-apply o 'bind-expression))
-           (lambda () 
-             (let ((b (core-apply o 'binding)))
-               `(bind ,b (apply anything))))))
-  
-
-
-;; choices = choice:x { "|" choice}*:xs => `(or ,x ,@xs);
-(defmethod choices ((o ometa-parser))
-  (let ((x (core-apply o 'choice)))
-    (let ((xs (core-many o
-                         (lambda () 
-                           (core-apply-with-args o 'seq-s '(#\|))
-                           (core-apply o 'choice)))))
-      `(or ,x ,@xs))))
-
-
-;; choice  = top-expression*:x action:ac => `(and ,@x ,ac)
-;;         | top-expression*:x           => `(and ,@x)
-;;         ;
-(defmethod choice ((o ometa-parser))
-  (core-or o
-            (lambda ()
-              (let ((x (core-many o
-                                  (lambda ()
-                                    (core-apply o 'top-expression)))))
-                (let ((ac (core-apply o 'action)))
-                  `(and ,@x ,ac))))
-            (lambda ()
-              (let ((z (core-many o
-                                  (lambda ()
-                                    (core-apply o 'top-expression)))))
-                `(and ,@z)))))
-
-
-;; top-expression  =   bind-expression
-;;                 |   repeated-expression
-;;                 ;
-(defmethod top-expression ((o ometa-parser))
-  (core-or o
-           (lambda ()
-             (core-apply o 'bind-expression))
-           (lambda ()
-             (core-apply o 'repeated-expression))))
-
-
-;; bind-expression = repeated-expression:e binding:b => `(bind ,b ,e)
-(defmethod bind-expression ((o ometa-parser))
-  (let ((e (core-apply o 'repeated-expression)))
-    (let ((b (core-apply o 'binding)))
-      `(bind ,b, e))))
-
-;; repeated-expression = term:t "*" => `(many ,t)
-;;                     |    term:t "+" => `(many1 ,t)
-;;                     |    term:t "?" => `(optional ,t)
-;;                     |    term
-;;                     ;
-(defmethod repeated-expression ((o ometa-parser))
+(defclass ometa-parser (ometa-base)
+          ((current-rule :initform nil :accessor ometa-current-rule)
+           (local-variables :initform (make-hash-table) :accessor
+            ometa-local-variables))) 
+ (defmethod ometa-add-local-var ((o ometa-parser) var)
+   (let* ((rule (ometa-current-rule o))
+          (vars (gethash rule (ometa-local-variables o))))
+     (unless (find var vars)
+       (push var (gethash rule (ometa-local-variables o)))))) 
+ (defmethod ometa-local-variables-list ((o ometa-parser))
+   (let ((res nil))
+     (maphash (lambda (k v) (setq res (cons (list k v) res)))
+              (ometa-local-variables o))
+     res)) 
+ (defmethod spacing ((o ometa-parser))
    (core-or o
             (lambda ()
-              (let ((t1 (core-apply o 'term)))
-                (core-apply-with-args o 'seq-s '(#\*))
-                `(many ,t1)))
-            (lambda ()
-              (let ((t2 (core-apply o 'term)))
-                (core-apply-with-args o 'seq-s '(#\+))
-                `(many1 ,t2)))
-            (lambda ()
-              (let ((t3 (core-apply o 'term)))
-                (core-apply-with-args o 'seq-s '(#\?))
-                `(optional ,t3)))
-            (lambda ()
-              (core-apply o 'term))))
-
-;; term  = '~'  element:e => `(not ,e)
-;;        |  '&'  element:e => `(lookahead ,e)
-;;        |  element
-;;        ;
-(defmethod term ((o ometa-parser))
-  (core-or o
-           (lambda ()
-             (core-apply-with-args o 'exactly #\~)
-              (let ((e (core-apply o 'element)))
-                `(not ,e)))
-           (lambda ()
-             (core-apply-with-args o 'exactly #\&)
-             (let ((e (core-apply o 'element)))
-               `(lookahead ,e)))
-           (lambda ()
-             (core-apply o 'element))))
-           
-;; binding    = ':' identifier:i => (progn (ometa-add-local o i) i)
-;;            ;
-(defmethod binding ((o ometa-parser))
-  (core-apply-with-args o 'exactly #\:)
-  (let ((i (core-apply o 'identifier)))
-    (progn
-      (ometa-add-local-var o i)
-      i)))
-
-;; element    =   prod-app
-;;             |  data-element
-;;             |  '%' host-lang-expr:s => `(sem-predicate ,s)
-;;             |  "{" choices:c "}" => c
-;;             ;
-(defmethod element ((o ometa-parser))
-  (core-or o
-           (lambda ()
-             (core-apply o 'prod-app))
-           (lambda ()
-             (core-apply o 'data-element))
-           (lambda ()
-             (core-apply-with-args o 'exactly #\%)
-             (let ((s (core-apply o 'host-lang-expr)))
-               `(sem-predicate ,s)))
-           (lambda ()
-             (core-apply-with-args o 'seq-s '(#\{))
-             (let ((c (core-apply o 'choices)))
-               (core-apply-with-args o 'seq-s '(#\}))
-               c))))
-             
-
-
-;; data-element =   char-sequence
-;;               |  char-sequence-s
-;;               |  string-literal
-;;               |  symbol
-;;               |  s-expr
-;;               |  any-symb
-;;               |  end-symb
-;;               ; 
-(defmethod data-element ((o ometa-parser))
-  (core-or o
-           (lambda ()
-             (core-apply o 'char-sequence))
-           (lambda ()
-             (core-apply o 'char-sequence-s))
-           (lambda ()
-             (core-apply o 'string-literal))
-           (lambda ()
-             (core-apply o 'asymbol))
-           (lambda ()
-             (core-apply o 's-expr))
-           (lambda ()
-             (core-apply o 'any-symb))
-           (lambda ()
-             (core-apply o 'end-symb))))
-
-
-
-;;action   = "=>" host-lang-expr:s => `(action ,s);
-(defmethod action ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\= #\>))
-  (let ((s (core-apply o 'host-lang-expr)))
-    `(action ,s)))
-
-
-;; host-lang-expr  = host-lang-quote:q host-lang-expand:e host-lang-s-expr:s => (string-trim '(#\Space #\Tab #\Newline) (concatenate 'string q e s));
-(defmethod host-lang-expr ((o ometa-parser))
-  (let ((q (core-apply o 'host-lang-quote)))
-    (let ((e (core-apply o 'host-lang-expand)))
-      (let ((s (core-apply o 'host-lang-s-expr)))
-        (string-trim '(#\Space #\Tab #\Newline) (concatenate 'string q e s))))))
-
-
-;; host-lang-quote  = {'`'+:q => (coerce q 'string) | '\''+:q => (coerce q 'string) | => ""};
-(defmethod host-lang-quote ((o ometa-parser))
-  (core-or o
-           (lambda ()
-             (let ((q (core-many1 o 
-                                  (lambda()
-                                    (core-apply-with-args o 'exactly #\`)))))
-               (coerce q 'string)))
-           (lambda ()
-             (let ((z (core-many1 o
-                                  (lambda ()
-                                    (core-apply-with-args o 'exactly #\')))))
-               (coerce z 'string)))
-           (lambda () "")))
-
-;; host-lang-expand = {','+:q => (coerce q 'string) | => ""}:qq  {'@':a => (coerce a 'string) | => ""}:aa => (concatenate 'string qq aa);
-(defmethod host-lang-expand ((o ometa-parser))
-  (let ((qq (core-or o
-                     (lambda ()
-                       (let ((q (core-many1 o 
-                                            (lambda ()
-                                              (core-apply-with-args o 'exactly #\,)))))
-                         (concatenate 'string q)))
-                     (lambda () ""))))
-    (let ((aa (core-or o
+              (core-or o
                        (lambda ()
-                         (let ((a (core-apply-with-args o 'exactly #\@)))
-                           (string a)))
-                       (lambda () ""))))
-      (concatenate 'string qq aa))))
-
-    
-;; host-lang-s-expr  = host-lang-atom
-;;                   |  "(" { host-lang-atom | host-lang-expr }*:x ")"
-;;                       =>  (concatenate 'string "(" x ")")
-;;                   ;
-(defmethod host-lang-s-expr ((o ometa-parser))
-  (core-or o
-           (lambda ()
-             (core-apply o 'host-lang-atom))
-           (lambda ()
-             (core-apply-with-args o 'seq-s '(#\())
-             (let ((x (core-many o
-                                 (lambda ()
-                                   (core-or o
-                                            (lambda ()
-                                              (core-apply o 'host-lang-atom))
-                                            (lambda ()
-                                              (core-apply o 'host-lang-expr)))))))
-               (core-apply-with-args o 'seq-s '(#\)))
-               (concatenate 'string "(" (reduce (lambda (a b) (concatenate 'string a " " b)) x) ")")))))
-
-
-;; host-lang-atom    = host-lang-quote:q host-lang-expand:e 
-;;                       { s-identifier | string-literal:l => (coerce `(#\" ,@l #\") 'string)}:a => (concatenate 'string q e a);
-(defmethod host-lang-atom ((o ometa-parser))
-  (let ((q (core-apply o 'host-lang-quote)))
-    (let ((e (core-apply o 'host-lang-expand)))
-      (let ((a (core-or o
-                        (lambda ()
-                          (core-apply o 's-identifier))
-                        (lambda ()
-                          (let ((l (core-apply o 'string-literal)))
-                            (coerce `(#\" ,@l #\") 'string))))))
-        (concatenate 'string q e a)))))
-
-;; s-identifier = {~{space | ';' | '(' | ')' | '}' | '{' | '|' } char:c => c}+:xs spaces 
-;;                => (coerce xs 'string);
-(defmethod s-identifier ((o ometa-parser))
-  (let ((xs 
-         (core-many1 o 
-                     (lambda ()
-                       (core-not o 
-                                 (lambda ()
-                                   (core-or o
-                                            (lambda ()
-                                              (core-apply o 'spacing))
-                                            (lambda ()
-                                              (core-apply-with-args o 'exactly #\;))
-                                            (lambda ()
-                                              (core-apply-with-args o 'exactly #\())
-                                            (lambda ()
-                                              (core-apply-with-args o 'exactly #\)))
-                                            (lambda ()
-                                              (core-apply-with-args o 'exactly #\}))
-                                            (lambda ()
-                                              (core-apply-with-args o 'exactly #\{))
-                                            (lambda ()
-                                              (core-apply-with-args o 'exactly #\|)))))
-                       (core-apply o 'chr)))))
-    (core-apply o 'spaces)
-    (coerce xs 'string)))
-                          
-
-(defmethod prod-app ((o ometa-parser))
-  (core-or o
-
-;; prod-app = "<" identifier:p ">" 
-;;                => `(apply ,p)
-;;           |  identifier:p
-;;                => `(apply ,p)
-;;           ;
-           (lambda ()
-             (core-apply-with-args o 'seq-s '(#\<))
-             (let ((p (core-apply o 'identifier)))
-               (core-apply-with-args o 'seq-s '(#\>))
-               `(apply ,p)))
-           (lambda ()
-             (let ((p (core-apply o 'identifier)))
-               `(apply ,p)))
-
-;; prod-app = "<" identifier:p prod-arg-list:args ">" 
-;;                => `(apply-with-args ,p (arguments ,@args))
-;;           ;
-           (lambda ()
-             (core-apply-with-args o 'seq-s '(#\<))
-             (let ((p (core-apply o 'identifier)))
-               (let ((args (core-apply o 'prod-arg-list)))
-                 (core-apply-with-args o 'seq-s '(#\>))
-                 `(apply-with-args ,p (arguments ,@args)))))
-;; prod-app = "^"
-;;             => `(apply-super-with-args ,(ometa-current-rule o) (arguments))
-;;           |  "<^" prod-arg-list:args ">"
-;;             => `(apply-super-with-args ,(ometa-current-rule o) (arguments ,@args))
-;;           ;
-           (lambda ()
-             (core-apply-with-args o 'seq-s '(#\^))
-             `(apply-super ,(ometa-current-rule o)))
-           (lambda ()
-             (core-apply-with-args o 'seq-s '(#\< #\^))
-             (let ((args (core-apply o 'prod-arg-list)))
-               (core-apply-with-args o 'seq-s '(#\>))
-               `(apply-super-with-args ,(ometa-current-rule o) (arguments ,@args))))))
- 
-
-;;  prod-arg-list  = prod-arg:x {"," prod-arg:a => a}*:xs => (cons x xs);
-(defmethod prod-arg-list ((o ometa-parser))
-  (let ((x (core-apply o 'prod-arg)))
-    (let ((xs (core-many o
+                         (progn
+                          (core-apply-with-args o 'seq '(#\/ #\*))
+                          (core-many o
+                                     (lambda ()
+                                       (core-or o
+                                                (lambda ()
+                                                  (progn
+                                                   (core-not o
+                                                             (lambda ()
+                                                               (core-apply-with-args
+                                                                o 'seq
+                                                                '(#\* #\/))))
+                                                   (core-apply o
+                                                               'anything))))))
+                          (core-apply-with-args o 'seq '(#\* #\/))))
+                       (lambda () (progn (call-next-method o))))))) 
+ (defmethod ometa ((o ometa-parser))
+   (let ((r nil) (ic nil) (sl nil) (i nil) (name nil))
+     (core-or o
+              (lambda ()
+                (core-or o
                          (lambda ()
-                           (core-apply-with-args o 'seq-s '(#\,))
-                           (core-apply o 'prod-arg)))))
-      (cons x xs))))
-
-
-                   
-;; prod-arg       = data-element | identifier
-;;                 ;
-(defmethod prod-arg ((o ometa-parser))
-  (core-or o
-           (lambda () (core-apply o 'data-element))
-           (lambda () (core-apply o 'identifier))))
-
-
-
-;; char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' char:c => c}+:cs "'" 
-;;                     => `(seq ,(list->string cs));
-(defmethod char-sequence ((o ometa-parser))
-  (core-apply-with-args o 'exactly #\')
-  (let ((cs (core-many1 o 
-                        (lambda () 
-                          (core-or o
-                                   (lambda ()
-                                     (core-apply-with-args o 'exactly #\\)
-                                     (core-apply-with-args o 'exactly #\'))
-                                   (lambda ()
-                                     (core-apply-with-args o 'exactly #\\)
-                                     (core-apply-with-args o 'exactly #\\))
-                                   (lambda ()
-                                     (core-not o
-                                               (lambda () (core-apply-with-args o 'exactly #\')))
-                                     (core-apply o 'chr)))))))
-    (core-apply-with-args o 'seq-s '(#\'))
-    `(seq ,(coerce cs 'string))))
-
-;; char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  char:c => c}*:cs "\"" => `(and 
-;;                                                                                    (seq ,(list->string cs))
-;;                                                                                    (apply spaces));
-(defmethod char-sequence-s ((o ometa-parser))
-  (core-apply-with-args o 'exactly #\")
-  (let ((cs (core-many o
+                           (progn
+                            (core-apply o 'spaces)
+                            (progn
+                             (core-apply-with-args o 'seq
+                                                   '(#\o #\m #\e #\t #\a))
+                             (core-apply o 'spaces))
+                            (setq name (core-apply o 'identifier))
+                            (setq i (core-apply o 'inheritance))
+                            (progn
+                             (core-apply-with-args o 'exactly #\{)
+                             (core-apply o 'spaces))
+                            (setq sl (core-apply o 'cl-slots))
+                            (setq ic (core-apply o 'inline-code))
+                            (setq r (core-apply o 'rules))
+                            (progn
+                             (core-apply-with-args o 'exactly #\})
+                             (core-apply o 'spaces))
+                            (core-apply o 'end)
+                            `(grammar ,name ,i
+                              (locals ,(ometa-local-variables-list o))
+                              (slots ,sl) (inline ,ic) ,@r)))))))) 
+ (defmethod inheritance ((o ometa-parser))
+   (let ((i nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'seq '(#\< #\:))
+                             (core-apply o 'spaces))
+                            (setq i (core-apply o 'identifier))
+                            `(parent ,i)))
+                         (lambda () (progn '(parent ometa-base)))))))) 
+ (defmethod cl-slots ((o ometa-parser))
+   (let ((s nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'seq
+                                                   '(#\_ #\s #\l #\o #\t #\s))
+                             (core-apply o 'spaces))
+                            (setq s
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-or o
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-not o
+                                                                       (lambda
+                                                                           ()
+                                                                         (core-apply-with-args
+                                                                          o
+                                                                          'exactly
+                                                                          #\;)))
+                                                             (core-apply o
+                                                                         'anything)))))))
+                            (progn
+                             (core-apply-with-args o 'exactly #\;)
+                             (core-apply o 'spaces))
+                            (concatenate 'string s)))
+                         (lambda () 'nil)))))) 
+ (defmethod inline-code ((o ometa-parser))
+   (let ((c nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'seq
+                                                   '(#\_ #\i #\n #\l #\i #\n
+                                                     #\e))
+                             (core-apply o 'spaces))
+                            (core-apply-with-args o 'exactly #\[)
+                            (setq c
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-or o
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-not o
+                                                                       (lambda
+                                                                           ()
+                                                                         (core-apply-with-args
+                                                                          o
+                                                                          'exactly
+                                                                          #\])))
+                                                             (core-apply o
+                                                                         'anything)))))))
+                            (core-apply-with-args o 'exactly #\])
+                            (progn
+                             (core-apply-with-args o 'exactly #\;)
+                             (core-apply o 'spaces))
+                            (concatenate 'string c)))
+                         (lambda () 'nil)))))) 
+ (defmethod rules ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o
                        (lambda ()
-                         (core-or o
-                                  (lambda ()
-                                    (core-apply-with-args o 'exactly #\\)
-                                    (core-apply-with-args o 'exactly #\"))
-                                  (lambda ()
-                                    (core-apply-with-args o 'exactly #\\)
-                                    (core-apply-with-args o 'exactly #\\))
-                                  (lambda ()
-                                    (core-not o
-                                              (lambda ()
-                                                (core-apply-with-args o 'exactly #\")))
-                                    (core-apply o 'chr)))))))
-    (core-apply-with-args o 'seq-s '(#\"))
-    `(and (seq ,(coerce cs 'string))
-          (apply spaces))))
-
-
-;;  string-literal = '``' {~'``' char:c => c}*:cs "''" => (exactly ,(coerce cs 'string));
-(defmethod string-literal ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\` #\`))
-  (let ((cs (core-many o
+                         (progn
+                          (core-many1 o (lambda () (core-apply o 'rule))))))))) 
+ (defmethod rule ((o ometa-parser))
+   (let ((p nil) (rname nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-lookahead o
+                                            (lambda ()
+                                              (core-or o
+                                                       (lambda ()
+                                                         (progn
+                                                          (setq rname
+                                                                  (core-apply o
+                                                                              'rule-name)))))))
+                            (setq p
+                                    (core-many1 o
+                                                (lambda ()
+                                                  (core-apply-with-args o
+                                                                        'rule-part
+                                                                        rname))))
+                            `(rule ,rname (or ,@p))))))))) 
+ (defmethod rule-part ((o ometa-parser))
+   (let ((r nil) (rname nil) (rn nil))
+     (core-or o
+              (lambda ()
+                (progn
+                 (setq rn (core-apply o 'anything))
+                 (core-or o
+                          (lambda ()
+                            (progn
+                             (setq rname (core-apply o 'rule-name))
+                             (core-pred o (eq rname rn))
+                             (setq r (core-apply o 'rule-rest))
+                             (progn
+                              (core-apply-with-args o 'exactly #\;)
+                              (core-apply o 'spaces))
+                             r)))))))) 
+ (defmethod rule-rest ((o ometa-parser))
+   (let ((ac nil) (c nil) (args nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'exactly #\=)
+                             (core-apply o 'spaces))
+                            (core-apply o 'choices)))
+                         (lambda () (progn (core-apply o 'action)))
+                         (lambda ()
+                           (progn
+                            (setq args
+                                    (core-many1 o
+                                                (lambda ()
+                                                  (core-apply o 'argument))))
+                            (progn
+                             (core-apply-with-args o 'exactly #\=)
+                             (core-apply o 'spaces))
+                            (setq c (core-apply o 'choices))
+                            `(and ,@args ,c)))
+                         (lambda ()
+                           (progn
+                            (setq args
+                                    (core-many1 o
+                                                (lambda ()
+                                                  (core-apply o 'argument))))
+                            (setq ac (core-apply o 'action))
+                            `(and ,@args ,ac)))))))) 
+ (defmethod rule-name ((o ometa-parser))
+   (let ((rname nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq rname (core-apply o 'identifier))
+                            (progn
+                             (setf (ometa-current-rule o) rname)
+                             rname)))))))) 
+ (defmethod argument ((o ometa-parser))
+   (let ((b nil))
+     (core-or o
+              (lambda ()
+                (core-or o (lambda () (progn (core-apply o 'bind-expression)))
+                         (lambda ()
+                           (progn
+                            (setq b (core-apply o 'binding))
+                            `(bind ,b (apply anything))))))))) 
+ (defmethod choices ((o ometa-parser))
+   (let ((xs nil) (c nil) (x nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq x (core-apply o 'choice))
+                            (setq xs
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-or o
+                                                          (lambda ()
+                                                            (progn
+                                                             (progn
+                                                              (core-apply-with-args
+                                                               o 'exactly #\|)
+                                                              (core-apply o
+                                                                          'spaces))
+                                                             (setq c
+                                                                     (core-apply
+                                                                      o
+                                                                      'choice))
+                                                             c))))))
+                            `(or ,x ,@xs)))))))) 
+ (defmethod choice ((o ometa-parser))
+   (let ((ac nil) (x nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq x
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-apply o
+                                                             'top-expression))))
+                            (setq ac (core-apply o 'action))
+                            `(and ,@x ,ac)))
+                         (lambda ()
+                           (progn
+                            (setq x
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-apply o
+                                                             'top-expression))))
+                            `(and ,@x)))))))) 
+ (defmethod top-expression ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o (lambda () (progn (core-apply o 'bind-expression)))
                        (lambda ()
-                         (core-not o
-                                   (lambda ()
-                                     (core-apply-with-args 'seq-s '(#\` #\`))))
-                         (core-apply o 'chr)))))
-    (core-apply-with-args o 'seq-s '(#\' #\'))
-    `(exactly ,(coerce cs 'string))))
-
-
-;; symbol         =  '#' identifier:t => `(symbol ,t);
-(defmethod asymbol ((o ometa-parser))
-  (core-apply-with-args o 'exactly #\#)
-  (let ((t1 (core-apply o 'identifier)))
-    `(symbol ,t1)))
-
-;; s-expr         =  "(" choice:s ")" => `(form ,s);
-(defmethod s-expr ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\())
-  (let ((s (core-apply o 'choice)))
-    (core-apply-with-args o 'seq-s '(#\)))
-    `(form ,s)))
-
-;; la-prefix      = "&";
-(defmethod la-prefix ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\&)))
-
-;; not-prefix     = "~";
-(defmethod not-prefix ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\~)))
-
-;; sem-prefix     = "%";
-(defmethod sem-prefix ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\%)))
-
-
-;; end-symb       = "$" => `(apply end);
-(defmethod end-symb ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\$))
-  `(apply end))
-
-;; any-symb       = "_" => `(apply anything);
-(defmethod any-symb ((o ometa-parser))
-  (core-apply-with-args o 'seq-s '(#\_))
-  `(apply anything))
-  
-
-
-;; (defun ometa-match (input rule)
-;;   (let* ((o (make-instance 'ometa-parser :input (make-ometa-stream input))))
-;;     (setf (ometa-rules o) '(ometa inheritance rules rule rule-part
-;;                             rule-rest rule-name argument choices choice
-;;                             top-expression bind-expression repeated-expression
-;;                             term binding element data-element action
-;;                             host-lang-expr host-lang-quote host-lang-expand
-;;                             host-lang-s-expr host-lang-atom s-identifier
-;;                             prod-app prod prod-arg-list prod-arg
-;;                             char-sequence cha-sequence-s string-literal
-;;                             asymbol s-expr la-prefix not-prefix sem-prefix
-;;                             end-symb any-symb))
-;;          (let ((res (catch 'ometa (core-apply o rule))))
-;;            (if (ometa-error-p res)
-;;                (cons 'error (ometa-reporting o))
-;;                res))))
-
+                         (progn (core-apply o 'repeated-expression))))))) 
+ (defmethod bind-expression ((o ometa-parser))
+   (let ((b nil) (e nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq e (core-apply o 'repeated-expression))
+                            (setq b (core-apply o 'binding))
+                            `(bind ,b ,e)))))))) 
+ (defmethod repeated-expression ((o ometa-parser))
+   (let ((e nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq e (core-apply o 'term))
+                            (progn
+                             (core-apply-with-args o 'exactly #\*)
+                             (core-apply o 'spaces))
+                            `(many ,e)))
+                         (lambda ()
+                           (progn
+                            (setq e (core-apply o 'term))
+                            (progn
+                             (core-apply-with-args o 'exactly #\+)
+                             (core-apply o 'spaces))
+                            `(many1 ,e)))
+                         (lambda ()
+                           (progn
+                            (setq e (core-apply o 'term))
+                            (progn
+                             (core-apply-with-args o 'exactly #\?)
+                             (core-apply o 'spaces))
+                            `(optional ,e)))
+                         (lambda () (progn (core-apply o 'term)))))))) 
+ (defmethod term ((o ometa-parser))
+   (let ((e nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'exactly #\~)
+                            (setq e (core-apply o 'element))
+                            `(not ,e)))
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'exactly #\&)
+                            (setq e (core-apply o 'element))
+                            `(lookahead ,e)))
+                         (lambda () (progn (core-apply o 'element)))))))) 
+ (defmethod binding ((o ometa-parser))
+   (let ((i nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'exactly #\:)
+                            (setq i (core-apply o 'identifier))
+                            (progn (ometa-add-local-var o i) i)))))))) 
+ (defmethod element ((o ometa-parser))
+   (let ((c nil) (s nil))
+     (core-or o
+              (lambda ()
+                (core-or o (lambda () (progn (core-apply o 'prod-app)))
+                         (lambda () (progn (core-apply o 'data-element)))
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'exactly #\%)
+                            (setq s (core-apply o 'host-lang-expr))
+                            `(sem-predicate ,s)))
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'exactly #\{)
+                             (core-apply o 'spaces))
+                            (setq c (core-apply o 'choices))
+                            (progn
+                             (core-apply-with-args o 'exactly #\})
+                             (core-apply o 'spaces))
+                            c))))))) 
+ (defmethod data-element ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o (lambda () (progn (core-apply o 'char-sequence)))
+                       (lambda () (progn (core-apply o 'char-sequence-s)))
+                       (lambda () (progn (core-apply o 'string-literal)))
+                       (lambda () (progn (core-apply o 'asymbol)))
+                       (lambda () (progn (core-apply o 's-expr)))
+                       (lambda () (progn (core-apply o 'any-symb)))
+                       (lambda () (progn (core-apply o 'end-symb))))))) 
+ (defmethod action ((o ometa-parser))
+   (let ((s nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'seq '(#\= #\>))
+                             (core-apply o 'spaces))
+                            (setq s (core-apply o 'host-lang-expr))
+                            `(action ,s)))))))) 
+ (defmethod host-lang-expr ((o ometa-parser))
+   (let ((s nil) (e nil) (q nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq q (core-apply o 'host-lang-quote))
+                            (setq e (core-apply o 'host-lang-expand))
+                            (setq s (core-apply o 'host-lang-s-expr))
+                            (str-trim (concatenate 'string q e s))))))))) 
+ (defmethod host-lang-quote ((o ometa-parser))
+   (let ((q nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-or o
+                                     (lambda ()
+                                       (progn
+                                        (setq q
+                                                (core-many1 o
+                                                            (lambda ()
+                                                              (core-apply-with-args
+                                                               o 'exactly
+                                                               #\`))))
+                                        (coerce q 'string)))
+                                     (lambda ()
+                                       (progn
+                                        (setq q
+                                                (core-many1 o
+                                                            (lambda ()
+                                                              (core-apply-with-args
+                                                               o 'exactly
+                                                               #\'))))
+                                        (coerce q 'string)))
+                                     (lambda () (progn "")))))))))) 
+ (defmethod host-lang-expand ((o ometa-parser))
+   (let ((aa nil) (a nil) (qq nil) (q nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq qq
+                                    (core-or o
+                                             (lambda ()
+                                               (progn
+                                                (setq q
+                                                        (core-many1 o
+                                                                    (lambda ()
+                                                                      (core-apply-with-args
+                                                                       o
+                                                                       'exactly
+                                                                       #\,))))
+                                                (concatenate 'string q)))
+                                             (lambda () (progn ""))))
+                            (setq aa
+                                    (core-or o
+                                             (lambda ()
+                                               (progn
+                                                (setq a
+                                                        (core-apply-with-args o
+                                                                              'exactly
+                                                                              #\@))
+                                                (string a)))
+                                             (lambda () (progn ""))))
+                            (concatenate 'string qq aa)))))))) 
+ (defmethod host-lang-s-expr ((o ometa-parser))
+   (let ((x nil))
+     (core-or o
+              (lambda ()
+                (core-or o (lambda () (progn (core-apply o 'host-lang-atom)))
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'exactly #\()
+                             (core-apply o 'spaces))
+                            (setq x
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-or o
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-apply o
+                                                                         'host-lang-atom)))
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-apply o
+                                                                         'host-lang-expr)))))))
+                            (progn
+                             (core-apply-with-args o 'exactly #\))
+                             (core-apply o 'spaces))
+                            (concatenate 'string " ("
+                                         (reduce
+                                          (lambda (a b)
+                                            (concatenate 'string a " " b))
+                                          x)
+                                         ") ")))))))) 
+ (defmethod host-lang-atom ((o ometa-parser))
+   (let ((a nil) (l nil) (e nil) (q nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq q (core-apply o 'host-lang-quote))
+                            (setq e (core-apply o 'host-lang-expand))
+                            (setq a
+                                    (core-or o
+                                             (lambda ()
+                                               (progn
+                                                (core-apply o 's-identifier)))
+                                             (lambda ()
+                                               (progn
+                                                (setq l
+                                                        (core-apply o
+                                                                    'string-literal))
+                                                (coerce `(,#\" ,@l #\")
+                                                        'string)))))
+                            (concatenate 'string q e a)))))))) 
+ (defmethod s-identifier ((o ometa-parser))
+   (let ((xs nil) (c nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq xs
+                                    (core-many1 o
+                                                (lambda ()
+                                                  (core-or o
+                                                           (lambda ()
+                                                             (progn
+                                                              (core-not o
+                                                                        (lambda
+                                                                            ()
+                                                                          (core-or
+                                                                           o
+                                                                           (lambda
+                                                                               ()
+                                                                             (progn
+                                                                              (core-apply
+                                                                               o
+                                                                               'spacing)))
+                                                                           (lambda
+                                                                               ()
+                                                                             (progn
+                                                                              (core-apply-with-args
+                                                                               o
+                                                                               'exactly
+                                                                               #\;)))
+                                                                           (lambda
+                                                                               ()
+                                                                             (progn
+                                                                              (core-apply-with-args
+                                                                               o
+                                                                               'exactly
+                                                                               #\()))
+                                                                           (lambda
+                                                                               ()
+                                                                             (progn
+                                                                              (core-apply-with-args
+                                                                               o
+                                                                               'exactly
+                                                                               #\))))
+                                                                           (lambda
+                                                                               ()
+                                                                             (progn
+                                                                              (core-apply-with-args
+                                                                               o
+                                                                               'exactly
+                                                                               #\})))
+                                                                           (lambda
+                                                                               ()
+                                                                             (progn
+                                                                              (core-apply-with-args
+                                                                               o
+                                                                               'exactly
+                                                                               #\{)))
+                                                                           (lambda
+                                                                               ()
+                                                                             (progn
+                                                                              (core-apply-with-args
+                                                                               o
+                                                                               'exactly
+                                                                               #\|))))))
+                                                              (setq c
+                                                                      (core-apply
+                                                                       o 'chr))
+                                                              c))))))
+                            (core-apply o 'spaces)
+                            (coerce xs 'string)))))))) 
+ (defmethod prod-app ((o ometa-parser))
+   (let ((args nil) (p nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'exactly #\<)
+                             (core-apply o 'spaces))
+                            (setq p (core-apply o 'identifier))
+                            (progn
+                             (core-apply-with-args o 'exactly #\>)
+                             (core-apply o 'spaces))
+                            `(apply ,p)))
+                         (lambda ()
+                           (progn
+                            (setq p (core-apply o 'identifier))
+                            `(apply ,p)))
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'exactly #\<)
+                             (core-apply o 'spaces))
+                            (setq p (core-apply o 'identifier))
+                            (setq args (core-apply o 'prod-arg-list))
+                            (progn
+                             (core-apply-with-args o 'exactly #\>)
+                             (core-apply o 'spaces))
+                            `(apply-with-args ,p (arguments ,@args))))
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'exactly #\^)
+                             (core-apply o 'spaces))
+                            `(apply-super ,(ometa-current-rule o))))
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'seq '(#\< #\^))
+                             (core-apply o 'spaces))
+                            (setq args (core-apply o 'prod-arg-list))
+                            (progn
+                             (core-apply-with-args o 'exactly #\>)
+                             (core-apply o 'spaces))
+                            `(apply-super-with-args ,(ometa-current-rule o)
+                              (arguments ,@args))))))))) 
+ (defmethod prod-arg-list ((o ometa-parser))
+   (let ((xs nil) (a nil) (x nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq x (core-apply o 'prod-arg))
+                            (setq xs
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-or o
+                                                          (lambda ()
+                                                            (progn
+                                                             (progn
+                                                              (core-apply-with-args
+                                                               o 'exactly #\,)
+                                                              (core-apply o
+                                                                          'spaces))
+                                                             (setq a
+                                                                     (core-apply
+                                                                      o
+                                                                      'prod-arg))
+                                                             a))))))
+                            (cons x xs)))))))) 
+ (defmethod prod-arg ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o (lambda () (progn (core-apply o 'data-element)))
+                       (lambda () (progn (core-apply o 'identifier))))))) 
+ (defmethod char-sequence ((o ometa-parser))
+   (let ((cs nil) (c nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'exactly #\')
+                            (setq cs
+                                    (core-many1 o
+                                                (lambda ()
+                                                  (core-or o
+                                                           (lambda ()
+                                                             (progn
+                                                              (core-apply-with-args
+                                                               o 'exactly #\\)
+                                                              (core-apply-with-args
+                                                               o 'exactly
+                                                               #\')))
+                                                           (lambda ()
+                                                             (progn
+                                                              (core-apply-with-args
+                                                               o 'exactly #\\)
+                                                              (core-apply-with-args
+                                                               o 'exactly
+                                                               #\\)))
+                                                           (lambda ()
+                                                             (progn
+                                                              (core-not o
+                                                                        (lambda
+                                                                            ()
+                                                                          (core-apply-with-args
+                                                                           o
+                                                                           'exactly
+                                                                           #\')))
+                                                              (setq c
+                                                                      (core-apply
+                                                                       o 'chr))
+                                                              c))))))
+                            (progn
+                             (core-apply-with-args o 'exactly #\')
+                             (core-apply o 'spaces))
+                            `(seq ,(coerce cs 'string))))))))) 
+ (defmethod char-sequence-s ((o ometa-parser))
+   (let ((cs nil) (c nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'exactly #\")
+                            (setq cs
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-or o
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-apply-with-args
+                                                              o 'exactly #\\)
+                                                             (core-apply-with-args
+                                                              o 'exactly #\")))
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-apply-with-args
+                                                              o 'exactly #\\)
+                                                             (core-apply-with-args
+                                                              o 'exactly #\\)))
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-not o
+                                                                       (lambda
+                                                                           ()
+                                                                         (core-apply-with-args
+                                                                          o
+                                                                          'exactly
+                                                                          #\")))
+                                                             (setq c
+                                                                     (core-apply
+                                                                      o 'chr))
+                                                             c))))))
+                            (progn
+                             (core-apply-with-args o 'exactly #\")
+                             (core-apply o 'spaces))
+                            `(and (seq ,(coerce cs 'string))
+                                  (apply spaces))))))))) 
+ (defmethod string-literal ((o ometa-parser))
+   (let ((cs nil) (c nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'seq '(#\` #\`))
+                            (setq cs
+                                    (core-many o
+                                               (lambda ()
+                                                 (core-or o
+                                                          (lambda ()
+                                                            (progn
+                                                             (core-not o
+                                                                       (lambda
+                                                                           ()
+                                                                         (core-apply-with-args
+                                                                          o
+                                                                          'seq
+                                                                          '(#\`
+                                                                            #\`))))
+                                                             (setq c
+                                                                     (core-apply
+                                                                      o 'char))
+                                                             c))))))
+                            (progn
+                             (core-apply-with-args o 'seq '(#\' #\'))
+                             (core-apply o 'spaces))
+                            `(exactly ,(coerce cs 'string))))))))) 
+ (defmethod asymbol ((o ometa-parser))
+   (let ((s nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-apply-with-args o 'exactly #\#)
+                            (setq s (core-apply o 'identifier))
+                            `(symbol ,s)))))))) 
+ (defmethod s-expr ((o ometa-parser))
+   (let ((s nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (progn
+                             (core-apply-with-args o 'exactly #\()
+                             (core-apply o 'spaces))
+                            (setq s (core-apply o 'choice))
+                            (progn
+                             (core-apply-with-args o 'exactly #\))
+                             (core-apply o 'spaces))
+                            `(form ,s)))))))) 
+ (defmethod la-prefix ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o
+                       (lambda ()
+                         (progn
+                          (progn
+                           (core-apply-with-args o 'exactly #\&)
+                           (core-apply o 'spaces)))))))) 
+ (defmethod not-prefix ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o
+                       (lambda ()
+                         (progn
+                          (progn
+                           (core-apply-with-args o 'exactly #\~)
+                           (core-apply o 'spaces)))))))) 
+ (defmethod sem-prefix ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o
+                       (lambda ()
+                         (progn
+                          (progn
+                           (core-apply-with-args o 'exactly #\%)
+                           (core-apply o 'spaces)))))))) 
+ (defmethod end-symb ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o
+                       (lambda ()
+                         (progn
+                          (progn
+                           (core-apply-with-args o 'exactly #\$)
+                           (core-apply o 'spaces))
+                          '(apply end))))))) 
+ (defmethod any-symb ((o ometa-parser))
+   (core-or o
+            (lambda ()
+              (core-or o
+                       (lambda ()
+                         (progn
+                          (progn
+                           (core-apply-with-args o 'exactly #\_)
+                           (core-apply o 'spaces))
+                          '(apply anything))))))) 
+ 
