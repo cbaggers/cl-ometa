@@ -1,8 +1,6 @@
 (defclass ometa-base ()
-  ((input        :accessor ometa-input     :initarg :input)
-   (rules        :accessor ometa-rules     :initform nil) ;;list of rules to report errors on
-   (dbg-indent   :accessor dbg-indent      :initform "")))
-
+  ((input  :accessor ometa-input
+           :initarg :input)))
 
   
 (defmethod ometa-current-pos ((o ometa-base))
@@ -13,7 +11,7 @@
 
 
 (defun ometa-match (data grammar rule)
-  (let ((bk-nil-print (pprint-dispatch nil)))
+  (let ((bk-nil-print (pprint-dispatch nil))) ;; TODO: use dynamic scope?
     (set-pprint-dispatch (type-of nil) #'nil-paren-print)
     (let* ((input (make-ometa-stream data))
            (o (make-instance grammar :input input))
