@@ -17,66 +17,96 @@
       (values data (read-sequence data s)))))
 
 
+(defun o-report (actf resf)
+  (multiple-value-bind (tag val)  (funcall actf)
+    (if (eq tag 'error)
+        (format nil "Error: ~a" val)
+        (funcall resf val))))
+    
  ;;; matching and returning
 
-(defun parse-p (parser)
+(defun parse-p ()
   (let ((src (file-string "src/ometa-parser.g")))
-    (ometa-match src parser 'ometa)))
+    (o-report 
+     (lambda ()
+       (ometa-match src 'ometa-parser 'ometa))
+     (lambda (res)
+       res))))
 
-(defun tr-p (parser)
-  (let ((ast (parse-p parser)))
-    (ometa-match ast 'ometa-translator 'ometa)))
+(defun tr-p ()
+  (let ((ast (parse-p)))
+    (if ast 
+        (o-report 
+         (lambda ()
+           (ometa-match ast 'ometa-translator 'ometa))
+         (lambda (res)
+           res)))))
 
-(defun parse-t (parser)
+(defun parse-t ()
   (let ((src (file-string "src/ometa-translator.g")))
-    (ometa-match src parser 'ometa)))
+    (o-report
+     (lambda ()
+       (ometa-match src 'ometa-parser 'ometa))
+     (lambda (res) res))))
 
-(defun tr-t (parser)
-  (let ((ast (parse-t parser)))
-    (ometa-match ast 'ometa-translator 'ometa)))
+(defun tr-t ()
+  (let ((ast (parse-t)))
+    (if ast
+        (o-report
+         (lambda ()
+           (ometa-match ast 'ometa-translator 'ometa))
+         (lambda (res) res)))))
 
 
 ;;; matching and writing
 
-(defun write-past (parser)
-  (let ((ast (parse-p parser)))
-    (with-open-file (f (ensure-directories-exist "gen/ometa-parser.ast") 
-                       :direction :output
-                       :if-exists :supersede)
-      (format f "~w" ast))
+(defun write-past ()
+  (let ((ast (parse-p)))
+    (if ast
+        (with-open-file (f (ensure-directories-exist "gen/ometa-parser.ast") 
+                           :direction :output
+                           :if-exists :supersede)
+          (format f "~w" ast)))
     ast))
 
 
-(defun write-psrc (parser)
-  (let ((ast (write-past parser)))
-    (with-open-file (f (ensure-directories-exist "gen/ometa-parser.lisp") 
-                       :direction :output
-                       :if-exists :supersede)
-      (let ((res (ometa-match ast 'ometa-translator 'ometa)))
-        (format f "~(~{~w ~% ~}~)" res)
-        res))))
+(defun write-psrc ()
+  (let ((ast (write-past)))
+    (if ast
+        (o-report 
+         (lambda () (ometa-match ast 'ometa-translator 'ometa))
+         (lambda (res)
+           (with-open-file (f (ensure-directories-exist "gen/ometa-parser.lisp") 
+                              :direction :output
+                              :if-exists :supersede)
+             (format f "~(~{~w ~% ~}~)" res)))))))
 
-
-(defun write-tast (parser)
-  (let ((ast (parse-p parser)))
-    (with-open-file (f (ensure-directories-exist "gen/ometa-translator.ast") 
-                       :direction :output
-                       :if-exists :supersede)
-      (format f "~w" ast))
+(defun write-tast ()
+  (let ((ast (parse-t)))
+    (if ast
+        (with-open-file (f (ensure-directories-exist "gen/ometa-translator.ast") 
+                           :direction :output
+                           :if-exists :supersede)
+          (format f "~w" ast)))
     ast))
 
 
-(defun write-tsrc (parser)
-  (let ((ast (write-past parser)))
-    (with-open-file (f (ensure-directories-exist "gen/ometa-translator.lisp") 
-                       :direction :output
-                       :if-exists :supersede)
-      (let ((res (ometa-match ast 'ometa-translator 'ometa)))
-        (format f "~(~{~w ~% ~}~)" res)
-        res))))
+(defun write-tsrc ()
+  (let ((ast (write-tast)))
+    (if ast
+        (o-report
+         (lambda () (ometa-match ast 'ometa-translator 'ometa))
+         (lambda (res)
+           (with-open-file (f (ensure-directories-exist "gen/ometa-translator.lisp") 
+                              :direction :output
+                              :if-exists :supersede)
+             (format t "~(~{~w ~% ~}~)" res)
+             (format f "~(~{~w ~% ~}~)" res)))))))
 
 
-;;
+(defun gen1 ()
+  (write-psrc)
+  (write-tsrc))
 
 (defun test-x ()
   (let ((src (file-string "x.g")))
