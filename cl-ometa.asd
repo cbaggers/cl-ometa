@@ -16,4 +16,5 @@
                              (:file "ometa-parser")
                              (:file "ometa-base")
                              (:file "stream")
+                             (:file "api")
                              (:file "error")))))
