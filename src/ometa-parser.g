@@ -132,7 +132,7 @@ ometa ometa-parser {
   host-lang-s-expr  = host-lang-atom
                      |  "(" { host-lang-atom | host-lang-expr }*:x ")"
                            =>  (if x (concatenate 'string "(" (reduce (lambda (a b) (concatenate 'string a " " b)) x) ")")
-                                     "")
+                                     "()")
                      ;
 
   host-lang-atom    = host-lang-quote:q host-lang-expand:e 

@@ -494,7 +494,7 @@
                                                 (concatenate 'string a " " b))
                                               x)
                                              ") ")
-                                "")))))))) 
+                                " () ")))))))) 
  (defmethod host-lang-atom ((o ometa-parser))
    (let ((a nil) (l nil) (e nil) (q nil))
      (core-or o

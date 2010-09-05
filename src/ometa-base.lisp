@@ -1,18 +1,7 @@
 (defclass ometa-base ()
   ((input        :accessor ometa-input     :initarg :input)
-   (errors       :accessor ometa-reporting :initform (make-error-reporting))
    (rules        :accessor ometa-rules     :initform nil) ;;list of rules to report errors on
    (dbg-indent   :accessor dbg-indent      :initform "")))
-
-(defmethod inc-dbg-indent ((o ometa-base))
-  (setf (dbg-indent o) (concatenate 'string (dbg-indent o) " ")))
-
-(defmethod dec-dbg-indent ((o ometa-base))
-  (setf (dbg-indent o) (subseq (dbg-indent o) 0 (1- (array-total-size (dbg-indent o))))))
-
-(defmethod ometa-add-error ((o ometa-base) pos msg)
-  (setf (ometa-reporting o) 
-        (add-error (ometa-reporting o) pos (stream-current-phrase (ometa-input o)) msg)))
 
 
   
@@ -24,12 +13,15 @@
 
 
 (defun ometa-match (data grammar rule)
-  (let* ((input (make-ometa-stream data))
-         (o (make-instance grammar :input input))
-         (res (catch 'ometa (core-apply o rule))))
-    (if (ometa-error-p res)
-        (values 'error (stream-get-pretty-error input))
-        (values t res))))
+  (let ((bk-nil-print (pprint-dispatch nil)))
+    (set-pprint-dispatch (type-of nil) #'nil-paren-print)
+    (let* ((input (make-ometa-stream data))
+           (o (make-instance grammar :input input))
+           (res (catch 'ometa (core-apply o rule))))
+      (set-pprint-dispatch (type-of nil) bk-nil-print)
+      (if (ometa-error-p res)
+          (values 'error (stream-get-pretty-error input))
+          (values t res)))))
 
 
 

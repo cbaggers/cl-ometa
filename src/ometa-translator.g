@@ -7,25 +7,29 @@ ometa ometa-translator <: ometa-base {
   ometa = #grammar {an-atom:name => (setf (grammar-name o) name)}
           inheritance:i locals slots:sl inline-code:ic
           rules:r 
-        => (if inline-code
+        => (if ic
             `((defclass ,name (,i) ,sl) ,@ic ,@r)
             `((defclass ,name (,i) ,sl) ,@r));
 
   inheritance = (#parent an-atom);
 
-  locals = (#locals ( { (an-atom:rname (an-atom+):vars )* => `(,rname ,@vars) }:lst ))
-            => (setf (ometa-local-variables o) (list->hash-table lst));
+  locals = (#locals (( {an-atom:rname (an-atom+):vars => `(,rname ,@vars) })*)):lst
+         => (setf (ometa-local-variables o) (list->hash-table lst));
 
   slots = (#slots { str:s => (read-from-string s) | => nil });
 
-  inline-code = (#inline { str:s => (read-all-from-string s) | => nil});
+  inline-code = (#inline { str:s => (read-all-from-string s) | #nil });
 
   rules = rule+;
 
   rule = (#rule an-atom:rname choice:p) 
           => (let ((locals (gethash rname (ometa-local-variables o))))
-              `(defmethod ,rname ((o ,(grammar-name o)))
-                ,(if (null locals) p `(let ,(map 'cons (lambda (x) (list x nil)) locals) ,p))));
+                     (let ((m `(defmethod ,rname ((o ,(grammar-name o))))))
+                       (if (null locals)
+                           (append m (list p))
+                           (let ((llet (list 'let (map 'cons (lambda (x) (list x nil)) locals))))
+                             (append m
+                                     (list (append llet (list p))))))));
 
   choice = (#and choice+:p) => `(progn ,@p)
          | (#and) => ''nil
@@ -33,7 +37,7 @@ ometa ometa-translator <: ometa-base {
          | pattern
          ;
 
-  pattern = (#bind an-atom:a choice:e) => `(seq ,a ,e)
+  pattern = (#bind an-atom:a choice:e) => `(setq ,a ,e)
           | (#action str:ac)           => (read-from-string ac)
           | expression
           ;
@@ -56,7 +60,7 @@ ometa ometa-translator <: ometa-base {
   
   apply-super-operation = (#apply-super an-atom) => `(call-next-method o);
 
-  apply-with-args-operation = (#apply-with-args an-atom:r (#arguments {an:atom|(#symbol an-atom:k => `',k)}*:a))
+  apply-with-args-operation = (#apply-with-args an-atom:r (#arguments {an-atom|(#symbol an-atom:k => `',k)}*:a))
                                => `(core-apply-with-args o ',r ,@a);
 
   seq-operation = (#seq str:s) => (if (eq (array-total-size s) 1)
@@ -86,7 +90,7 @@ ometa ometa-translator <: ometa-base {
 
   form-operation = (#form choice:x) => `(core-form o (lambda () ,x));
 
-  symbol-operation = (#symbol an-atom:x) => `(core-apply-with-args o 'exactly ,x);
+  symbol-operation = (#symbol an-atom:x) => `(core-apply-with-args o 'exactly ',x);
 
   predicate = (#sem-predicate str:s) => `(core-pred o ,(read-from-string s));
 
