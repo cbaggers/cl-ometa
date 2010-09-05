@@ -19,6 +19,7 @@
                             (setq sl (core-apply o 'slots))
                             (setq ic (core-apply o 'inline-code))
                             (setq r (core-apply o 'rules))
+                            (core-apply o 'end)
                             (if ic
                                 `((defclass ,name (,i) ,sl) ,@ic ,@r)
                                 `((defclass ,name (,i) ,sl) ,@r))))))))) 
@@ -250,6 +251,7 @@
                        (lambda () (progn (core-apply o 'optional-operation)))
                        (lambda () (progn (core-apply o 'form-operation)))
                        (lambda () (progn (core-apply o 'symbol-operation)))
+                       (lambda () (progn (core-apply o 'number-operation)))
                        (lambda () (progn (core-apply o 'predicate)))
                        (lambda ()
                          (progn (core-apply o 'lookahead-operation))))))) 
@@ -455,6 +457,20 @@
                                                                 'symbol)
                                           (setq x (core-apply o 'an-atom)))))
                             `(core-apply-with-args o 'exactly ',x)))))))) 
+ (defmethod number-operation ((o ometa-translator))
+   (let ((x nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-form o
+                                       (lambda ()
+                                         (progn
+                                          (core-apply-with-args o 'exactly
+                                                                'number)
+                                          (setq x (core-apply o 'an-atom)))))
+                            `(core-apply-with-args o 'exactly ,x)))))))) 
  (defmethod predicate ((o ometa-translator))
    (let ((s nil))
      (core-or o
@@ -477,5 +493,7 @@
                          (lambda ()
                            (progn
                             (setq a (core-apply o 'anything))
-                            (progn (core-pred o (symbolp a)) a)))))))) 
+                            (progn
+                             (core-pred o (or (symbolp a) (numberp a)))
+                             a)))))))) 
  

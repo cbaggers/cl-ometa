@@ -380,7 +380,8 @@
                        (lambda () (progn (core-apply o 'asymbol)))
                        (lambda () (progn (core-apply o 's-expr)))
                        (lambda () (progn (core-apply o 'any-symb)))
-                       (lambda () (progn (core-apply o 'end-symb))))))) 
+                       (lambda () (progn (core-apply o 'end-symb)))
+                       (lambda () (progn (core-apply o 'number-r10))))))) 
  (defmethod action ((o ometa-parser))
    (let ((s nil))
      (core-or o
@@ -853,4 +854,17 @@
                            (core-apply-with-args o 'exactly #\_)
                            (core-apply o 'spaces))
                           '(apply anything))))))) 
+ (defmethod number-r10 ((o ometa-parser))
+   (let ((d nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (setq d
+                                    (core-many1 o
+                                                (lambda ()
+                                                  (core-apply o 'digit))))
+                            `(number
+                              ,(parse-integer (concatenate 'string d)))))))))) 
  

@@ -108,6 +108,7 @@ ometa ometa-parser {
                |  s-expr
                |  any-symb
                |  end-symb
+               |  number-r10
                ; 
 
   action     = "=>" host-lang-expr:s => `(action ,s);
@@ -180,5 +181,5 @@ ometa ometa-parser {
   sem-prefix     = "%";
   end-symb       = "$" => `(apply end);
   any-symb       = "_" => `(apply anything);
-
+  number-r10     = digit+:d => `(number ,(parse-integer (concatenate 'string d)));
 }

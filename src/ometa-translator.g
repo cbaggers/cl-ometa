@@ -6,7 +6,7 @@ ometa ometa-translator <: ometa-base {
 
   ometa = #grammar {an-atom:name => (setf (grammar-name o) name)}
           inheritance:i locals slots:sl inline-code:ic
-          rules:r 
+          rules:r $
         => (if ic
             `((defclass ,name (,i) ,sl) ,@ic ,@r)
             `((defclass ,name (,i) ,sl) ,@r));
@@ -52,6 +52,7 @@ ometa ometa-translator <: ometa-base {
              | optional-operation
              | form-operation
              | symbol-operation
+             | number-operation
              | predicate
              | lookahead-operation
              ;
@@ -91,9 +92,10 @@ ometa ometa-translator <: ometa-base {
   form-operation = (#form choice:x) => `(core-form o (lambda () ,x));
 
   symbol-operation = (#symbol an-atom:x) => `(core-apply-with-args o 'exactly ',x);
+  number-operation = (#number an-atom:x) => `(core-apply-with-args o 'exactly ,x);
+
 
   predicate = (#sem-predicate str:s) => `(core-pred o ,(read-from-string s));
 
-  an-atom = _:a => (progn (core-pred o (symbolp a)) a);
+  an-atom = _:a => (progn (core-pred o (or (symbolp a) (numberp a))) a);
 }
-
