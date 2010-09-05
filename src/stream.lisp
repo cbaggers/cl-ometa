@@ -110,7 +110,7 @@
                   (format nil "~w" input)))
          (len (array-total-size str))
          (phrase (subseq str
-                         0 (if (< len 10) len 10))))
+                         0 (if (< len 20) len 20))))
     (concatenate 'string "'" (substitute #\Space #\Newline phrase)  "...'")))
 
 (defmethod stream-farthest-error-element ((s ometa-stream))
