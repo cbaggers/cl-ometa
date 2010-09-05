@@ -121,6 +121,19 @@
 (defmethod core-many1 ((o ometa-base) fun)
   (core-many o fun (funcall fun)))
 
+(defmethod core-repeat ((o ometa-base) times fun)
+  (let ((res (list)))
+    (do ((i 0 (+ 1 i))) ((= times i)) 
+      (let* ((orig-input (ometa-input o))
+             (r (catch 'ometa (funcall fun))))
+        (if (ometa-error-p r)
+            (progn
+              (setf (ometa-input o) orig-input)
+              (throw-ometa-error))
+            (setf res (cons r res)))))
+    (reverse res)))
+
+
 (defmethod core-form ((o ometa-base) fun)
   (let ((v (core-apply o 'anything)))
     (core-pred o (listp v))
@@ -191,6 +204,12 @@
   (let ((r (core-apply o 'chr)))
     (core-pred o (and (char>= r #\0) (char<= r #\9)))
     r))
+
+(defmethod str-number ((o ometa-base))
+  (let ((ds (core-many1 o 
+                        (lambda () 
+                          (core-apply o 'digit)))))
+    (parse-integer (concatenate 'string ds))))
 
 (defmethod lower ((o ometa-base))
   (let ((r (core-apply o 'chr)))

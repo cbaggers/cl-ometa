@@ -25,7 +25,7 @@ ometa ometa-parser {
           | ^
           ;
 
-  ometa = spaces "ometa" identifier:name inheritance:i  "{" 
+  ometa = spaces "ometa" identifier:name inheritance:i  "{"
               cl-slots:sl inline-code:ic 
               rules:r 
           "}" $
@@ -84,6 +84,7 @@ ometa ometa-parser {
   repeated-expression = term:e "*" => `(many ,e)
                       | term:e "+" => `(many1 ,e)
                       | term:e "?" => `(optional ,e)
+                      | term:e '[' str-number:rep ']' => `(repeat ,rep ,e)
                       | term
                       ;
 
@@ -108,7 +109,7 @@ ometa ometa-parser {
                |  s-expr
                |  any-symb
                |  end-symb
-               |  number-r10
+               |  s-number
                ; 
 
   action     = "=>" host-lang-expr:s => `(action ,s);
@@ -181,5 +182,6 @@ ometa ometa-parser {
   sem-prefix     = "%";
   end-symb       = "$" => `(apply end);
   any-symb       = "_" => `(apply anything);
-  number-r10     = digit+:d => `(number ,(parse-integer (concatenate 'string d)));
+
+  s-number       = num:n => `(number ,n);
 }

@@ -247,6 +247,7 @@
                        (lambda () (progn (core-apply o 'seq-operation)))
                        (lambda () (progn (core-apply o 'many-operation)))
                        (lambda () (progn (core-apply o 'many1-operation)))
+                       (lambda () (progn (core-apply o 'repeat-operation)))
                        (lambda () (progn (core-apply o 'not-operation)))
                        (lambda () (progn (core-apply o 'optional-operation)))
                        (lambda () (progn (core-apply o 'form-operation)))
@@ -429,6 +430,23 @@
                             (if (listp (car x))
                                 `(core-opt o (lambda ,nil ,@x))
                                 `(core-opt o (lambda ,nil ,x)))))))))) 
+ (defmethod repeat-operation ((o ometa-translator))
+   (let ((x nil) (n nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-form o
+                                       (lambda ()
+                                         (progn
+                                          (core-apply-with-args o 'exactly
+                                                                'repeat)
+                                          (setq n (core-apply o 'num))
+                                          (setq x (core-apply o 'choice)))))
+                            (if (listp (car x))
+                                `(core-repeat o ,n (lambda ,nil ,@x))
+                                `(core-repeat o ,n (lambda ,nil ,x)))))))))) 
  (defmethod form-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o

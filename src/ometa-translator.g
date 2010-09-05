@@ -48,6 +48,7 @@ ometa ometa-translator <: ometa-base {
              | seq-operation
              | many-operation
              | many1-operation
+             | repeat-operation
              | not-operation
              | optional-operation
              | form-operation
@@ -88,6 +89,10 @@ ometa ometa-translator <: ometa-base {
   optional-operation = (#optional choice:x) => (if (listp (car x))
                                                      `(core-opt o (lambda () ,@x))
                                                      `(core-opt o (lambda () ,x)));
+
+  repeat-operation   = (#repeat  num:n choice:x) => (if (listp (car x))
+                                                                       `(core-repeat o ,n (lambda () ,@x))
+                                                                       `(core-repeat o ,n (lambda () ,x)));
 
   form-operation = (#form choice:x) => `(core-form o (lambda () ,x));
 
