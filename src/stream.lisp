@@ -88,26 +88,30 @@
                      :head (s-index lst idx))))
 
 (defmethod stream-tail ((s ometa-stream))
-  (if (not (null (slot-value s 'tail)))
+  (if (slot-value s 'tail)
       (slot-value s 'tail)
       (let ((tail (new-ometa-stream (stream-input s)
                                     (stream-current-line s)
                                     (1+ (stream-index s)))))
-        (if (newline-p (stream-head tail))
-            (incf (slot-value tail 'line)))            
-        (setf (slot-value s 'tail) tail))))
+        (unless (eq (class-name (class-of tail)) 'ometa-stream-end)
+          (if (newline-p (stream-head tail))
+              (incf (slot-value tail 'line)))            
+          (setf (slot-value s 'tail) tail))
+        tail)))
 
 
 (defmethod stream-length ((s ometa-stream))
   (s-size (stream-input s)))
 
 (defmethod stream-current-phrase ((s ometa-stream))
-  (let* ((begin (stream-index s))
-         (len (stream-length s))
-         (left (- len (stream-index s)))
-         (phrase (subseq (stream-input s) 
-                         begin (if (< left 10) len (+ begin 10)))))
-    (concatenate 'string "'" (substitute #\Space #\Newline phrase)  "'")))
+  (let* ((input (subseq (stream-input s) (stream-index s)))
+         (str (if (stringp input)
+                  input
+                  (format nil "~w" input)))
+         (len (array-total-size str))
+         (phrase (subseq str
+                         0 (if (< len 10) len 10))))
+    (concatenate 'string "'" (substitute #\Space #\Newline phrase)  "...'")))
 
 (defmethod stream-farthest-error-element ((s ometa-stream))
   (labels ((lookup (cur)
