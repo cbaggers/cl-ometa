@@ -106,7 +106,10 @@
                                                                           'str))
                                                       (read-from-string s)))
                                                    (lambda ()
-                                                     (progn))))))))))))) 
+                                                     (progn
+                                                      (core-apply-with-args o
+                                                                            'exactly
+                                                                            'nil)))))))))))))) 
  (defmethod inline-code ((o ometa-translator))
    (let ((s nil))
      (core-or o
