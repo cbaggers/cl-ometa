@@ -1,3 +1,6 @@
+(defun newline-p (chr)
+  (eq chr #\Newline))
+
 (defun str-trim (str)
   (string-trim '(#\Space #\Tab #\Newline) str))
 

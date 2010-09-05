@@ -1,8 +1,8 @@
-(let ((ometa-path (concatenate 'string 
-                               (directory-namestring 
-                                *default-pathname-defaults*) 
-                               "../")))
-  (push ometa-path asdf:*central-registry*))
+;; (let ((ometa-path (concatenate 'string 
+;;                                (directory-namestring 
+;;                                 *default-pathname-defaults*) 
+;;                                "../")))
+;;   (push ometa-path asdf:*central-registry*))
 
 
 ;; --
@@ -76,13 +76,22 @@
         res))))
 
 
-;; read-from-string
-;;;;; other testing
+;;
 
-(defun test-x (parser rule)
+(defun test-x ()
   (let ((src (file-string "x.g")))
-    (ometa-match src parser rule)))
+    (break "x")
+    (ometa-match src 'ometa-parser 'rule)))
 
-(defun test-ast (parser rule)
-  (let ((src (read-from-string (file-string "x.ast"))))
-    (ometa-match src parser rule)))
+(defun t-err1 ()
+  (let* ((src (file-string "x.g")))
+    (multiple-value-bind (tag val)  (ometa-match src 'ometa-parser 'ometa)
+      (if (eq tag 'error)
+          (format t "Error: ~a~%" val)
+          val))))
+
+(defun t-err2 ()
+  (let ((data (file-string "x.g")))
+    (let ((o (make-instance 'ometa-parser :input (make-ometa-stream data))))
+      (let ((res (catch 'ometa (core-apply o 'ometa))))
+        res))))

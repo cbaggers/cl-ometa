@@ -82,9 +82,9 @@ ometa ometa-parser {
                   ;
 
   repeated-expression = term:e "*" => `(many ,e)
-                      |    term:e "+" => `(many1 ,e)
-                      |    term:e "?" => `(optional ,e)
-                      |    term
+                      | term:e "+" => `(many1 ,e)
+                      | term:e "?" => `(optional ,e)
+                      | term
                       ;
 
   term  = '~'  element:e => `(not ,e)
@@ -95,7 +95,7 @@ ometa ometa-parser {
   binding = ':' identifier:i => (progn (ometa-add-local-var o i) i)
           ;
 
-  element = prod-app
+  element =  prod-app
           |  data-element
           |  '%' host-lang-expr:s => `(sem-predicate ,s)
           |  "{" choices:c "}" => c
