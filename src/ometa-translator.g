@@ -16,7 +16,7 @@ ometa ometa-translator <: ometa-base {
   locals = (#locals (( {an-atom:rname (an-atom+):vars => `(,rname ,@vars) })*)):lst
          => (setf (ometa-local-variables o) (list->hash-table lst));
 
-  slots = (#slots { str:s => (read-from-string s) | => nil });
+  slots = (#slots { str:s => (read-from-string s) | #nil });
 
   inline-code = (#inline { str:s => (read-all-from-string s) | #nil });
 
