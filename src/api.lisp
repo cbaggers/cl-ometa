@@ -8,7 +8,7 @@
 (defun o-report (actf resf)
   (multiple-value-bind (tag val)  (funcall actf)
     (if (eq tag 'error)
-        (format nil "Error: ~a" val)
+        (values nil (format nil "Error: ~a" val))
         (funcall resf val))))
 
 
@@ -33,4 +33,5 @@
           (with-open-file (f (ensure-directories-exist dest)
                              :direction :output
                              :if-exists :supersede)
-            (format f "~(~{~w ~% ~}~)" res))))))))
+            (format f "~(~{~w ~% ~}~)" res))
+          t))))))

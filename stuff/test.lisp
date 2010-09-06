@@ -125,3 +125,26 @@
     (let ((o (make-instance 'ometa-parser :input (make-ometa-stream data))))
       (let ((res (catch 'ometa (core-apply o 'ometa))))
         res))))
+
+
+
+(defun t-exp ()
+  (multiple-value-bind (tag val)  (ometa-match "ometa x { 1a = x; }" 'ometa-parser 'ometa)
+    (if (eq tag 'error)
+        val
+        (ometa-match  val 'ometa-translator 'ometa))))
+  
+
+(defun match (filepath dest)
+  (let ((data (file-string filepath)))
+    (o-report
+     (lambda ()
+       (ometa-match data 'ometa-parser 'ometa))
+     (lambda (ast)
+       (o-report
+        (lambda () (ometa-match ast 'ometa-translator 'ometa))
+        (lambda (res)
+          (with-open-file (f (ensure-directories-exist dest)
+                             :direction :output
+                             :if-exists :supersede)
+            (format f "~(~{~w ~% ~}~)" res))))))))

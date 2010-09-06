@@ -102,7 +102,7 @@ ometa ometa-parser {
           |  "{" choices:c "}" => c
           ;
 
-  data-element = char-sequence
+  data-element =  char-sequence
                |  char-sequence-s
                |  string-literal
                |  asymbol

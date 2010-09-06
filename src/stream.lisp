@@ -36,28 +36,16 @@
 (defgeneric s-first (s))
 (defgeneric s-size (s))
 
-(defmethod s-first ((s string))
-  (char s 0))
-
-(defmethod s-first ((c cons))
-  (car c))
-
+(defmethod s-first ((s sequence))
+  (elt s 0))
 (defmethod s-first ((n null))  n)
 
-(defmethod s-size ((s string))
-  (array-total-size s))
-
-(defmethod s-size ((c cons))
-  (length c))
-
+(defmethod s-size ((s sequence))
+  (length s))
 (defmethod s-size ((n null)) 0)
 
-(defmethod s-index ((s string) idx)
-  (aref s idx))
-
-(defmethod s-index ((c cons) idx)
-  (nth idx c))
-
+(defmethod s-index ((s sequence) idx)
+  (elt s idx))
 ;; is there a need for s-index((n null))?
 
 (defmethod make-ometa-stream (seq)
