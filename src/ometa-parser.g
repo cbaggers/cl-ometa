@@ -190,9 +190,7 @@ ometa ometa-parser {
   char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' chr:c => c}+:cs "'" 
                      => `(seq ,(coerce cs 'string));
 
-  char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  chr:c => c}*:cs "\"" => `(and 
-                                                                                    (seq ,(coerce cs 'string))
-                                                                                    (apply spaces));
+  char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  chr:c => c}*:cs "\"" => `(seq-s ,(coerce cs 'string));
 
   string-object = '``' {~'``' char:c => c}*:cs "''" => `(exactly ,(coerce cs 'string));
 

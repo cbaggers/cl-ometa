@@ -88,8 +88,13 @@ ometa ometa-translator <: ometa-base {
 
   seq-operation = (#seq str:s) => (if (eq (array-total-size s) 1)
                                       `(core-apply-with-args o 'exactly ,(aref s 0))
-                                      `(core-apply-with-args o 'seq ',(concatenate 'list s)));
-
+                                      `(core-apply-with-args o 'seq ',(concatenate 'list s)))
+                | (#seq-s str:s) => (if (eq (array-total-size s) 1)
+                                         `(let ((res (core-apply-with-args o 'exactly ,(aref s 0))))
+                                            (core-apply o 'spaces)
+                                            res)
+                                         `(core-apply-with-args o 'seq-s ',(concatenate 'list s)))
+                ;
 
   many-operation = (#many choice:x) => (if (listp (car x))
                                            `(core-many o (lambda () ,@x))
