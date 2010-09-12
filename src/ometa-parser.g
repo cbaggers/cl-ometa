@@ -128,7 +128,7 @@ ometa ometa-parser {
 
   data-element =  char-sequence
                |  char-sequence-s
-               |  string-literal
+               |  string-object
                |  asymbol
                |  s-expr
                |  any-symb
@@ -163,7 +163,7 @@ ometa ometa-parser {
 
   host-lang-atom    = host-lang-quote:q host-lang-expand:e 
                       {   s-identifier 
-                        | string-literal:l 
+                        | string-object:l 
                           => (coerce `(#\" ,@l #\") 'string)
                        }:a  => (concatenate 'string q e a);
 
@@ -194,7 +194,7 @@ ometa ometa-parser {
                                                                                     (seq ,(coerce cs 'string))
                                                                                     (apply spaces));
 
-  string-literal = '``' {~'``' char:c => c}*:cs "''" => `(exactly ,(coerce cs 'string));
+  string-object = '``' {~'``' char:c => c}*:cs "''" => `(exactly ,(coerce cs 'string));
 
   asymbol     =  '#' identifier:s => `(symbol ,s);
 
