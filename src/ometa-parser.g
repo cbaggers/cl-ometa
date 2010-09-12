@@ -35,6 +35,8 @@ ometa ometa-parser {
   _inline [(defmethod ometa-add-local-var ((o ometa-parser) var)
             (let* ((rule (ometa-current-rule o))
                    (vars (gethash rule (ometa-local-variables o))))
+             (if (eq var 'o)
+                (throw 'ometa "variable 'o' conflicts with internal 'o' var."))
              (unless (find var vars)
               (push var (gethash rule (ometa-local-variables o))))))
            
