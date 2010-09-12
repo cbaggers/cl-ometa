@@ -32,11 +32,11 @@
         (funcall resf val))))
 
 
-(defun ast-for (filepath)
+(defun ast-for (filepath grammar rule)
   (let ((data (file-string filepath)))
     (o-report
      (lambda ()
-       (ometa-match data 'ometa-parser 'ometa))
+       (ometa-match data grammar rule))
      (lambda (ast)
        ast))))
 
