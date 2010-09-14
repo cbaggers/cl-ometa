@@ -75,6 +75,7 @@ ometa ometa-translator <: ometa-base {
              | form-operation
              | symbol-operation
              | number-operation
+             | string-eq-operation
              | predicate
              | lookahead-operation
              ;
@@ -125,6 +126,9 @@ ometa ometa-translator <: ometa-base {
   symbol-operation = (#symbol an-atom:x) => `(core-apply-with-args o 'exactly ',x);
   number-operation = (#number an-atom:x) => `(core-apply-with-args o 'exactly ,x);
 
+
+  string-eq-operation = (#string-eq str:s) => `(core-apply-with-args o 'str-eq ,s)
+                      ;
 
   predicate = (#sem-predicate str:s) => `(core-pred o ,(read-from-string s));
 
