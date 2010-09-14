@@ -162,9 +162,7 @@ ometa ometa-parser {
                      ;
 
   host-lang-atom    = host-lang-quote:q host-lang-expand:e 
-                      {   s-identifier 
-                        | string-object:l 
-                          => (coerce `(#\" ,@l #\") 'string)
+                      {   s-identifier                         
                        }:a  => (concatenate 'string q e a);
 
   s-identifier = {~{spacing | ';' | '(' | ')' | '}' | '{' | '|' } 
