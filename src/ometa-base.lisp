@@ -276,8 +276,25 @@
 (defmethod token ((o ometa-base))
   (coerce (core-apply-with-args o 'first-and-rest 'letter 'alpha-char) 'string))
 
+(defmethod token-s ((o ometa-base))
+  (let ((k (core-apply o 'token)))
+    (core-apply o 'spaces)
+    k))
+
+(defmethod asymbol ((o ometa-base))
+  (let ((s (core-apply o 'anything)))
+    (core-pred o (symbolp s))
+    s))
+
 (defmethod identifier ((o ometa-base))
   (let ((ret (core-apply o 'token)))
     (core-apply o 'spaces)
     (let ((min (string-upcase ret)))
       (intern min))))
+
+(defmethod str-eq ((o ometa-base))
+  (let* ((wanted (core-apply o 'anything))
+         (found  (core-apply o 'anything)))
+    (core-pred o (and (stringp wanted) (stringp found)))
+    (core-pred o (string= wanted found))
+    found))
