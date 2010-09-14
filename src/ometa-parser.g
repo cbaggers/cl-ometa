@@ -190,7 +190,7 @@ ometa ometa-parser {
 
   char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  chr:c => c}*:cs "\"" => `(seq-s ,(coerce cs 'string));
 
-  string-object = '``' {~'``' char:c => c}*:cs "''" => `(exactly ,(coerce cs 'string));
+  string-object = '``' {~'\'\'' chr:c => c}*:cs "''" => `(string-eq ,(coerce cs 'string));
 
   asymbol     =  '#' identifier:s => `(symbol ,s);
 
