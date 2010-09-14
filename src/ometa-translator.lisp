@@ -258,6 +258,7 @@
                        (lambda () (progn (core-apply o 'form-operation)))
                        (lambda () (progn (core-apply o 'symbol-operation)))
                        (lambda () (progn (core-apply o 'number-operation)))
+                       (lambda () (progn (core-apply o 'string-eq-operation)))
                        (lambda () (progn (core-apply o 'predicate)))
                        (lambda ()
                          (progn (core-apply o 'lookahead-operation))))))) 
@@ -511,6 +512,20 @@
                                                                 'number)
                                           (setq x (core-apply o 'an-atom)))))
                             `(core-apply-with-args o 'exactly ,x)))))))) 
+ (defmethod string-eq-operation ((o ometa-translator))
+   (let ((s nil))
+     (core-or o
+              (lambda ()
+                (core-or o
+                         (lambda ()
+                           (progn
+                            (core-form o
+                                       (lambda ()
+                                         (progn
+                                          (core-apply-with-args o 'exactly
+                                                                'string-eq)
+                                          (setq s (core-apply o 'str)))))
+                            `(core-apply-with-args o 'str-eq ,s)))))))) 
  (defmethod predicate ((o ometa-translator))
    (let ((s nil))
      (core-or o

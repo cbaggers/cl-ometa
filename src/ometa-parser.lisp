@@ -500,7 +500,7 @@
                                              ") ")
                                 " () ")))))))) 
  (defmethod host-lang-atom ((o ometa-parser))
-   (let ((a nil) (l nil) (e nil) (q nil))
+   (let ((a nil) (e nil) (q nil))
      (core-or o
               (lambda ()
                 (core-or o
@@ -512,14 +512,8 @@
                                     (core-or o
                                              (lambda ()
                                                (progn
-                                                (core-apply o 's-identifier)))
-                                             (lambda ()
-                                               (progn
-                                                (setq l
-                                                        (core-apply o
-                                                                    'string-object))
-                                                (coerce `(,#\" ,@l #\")
-                                                        'string)))))
+                                                (core-apply o
+                                                            's-identifier)))))
                             (concatenate 'string q e a)))))))) 
  (defmethod s-identifier ((o ometa-parser))
    (let ((xs nil) (c nil))
@@ -774,14 +768,14 @@
                                                                          (core-apply-with-args
                                                                           o
                                                                           'seq
-                                                                          '(#\`
-                                                                            #\`))))
+                                                                          '(#\'
+                                                                            #\'))))
                                                              (setq c
                                                                      (core-apply
-                                                                      o 'char))
+                                                                      o 'chr))
                                                              c))))))
                             (core-apply-with-args o 'seq-s '(#\' #\'))
-                            `(exactly ,(coerce cs 'string))))))))) 
+                            `(string-eq ,(coerce cs 'string))))))))) 
  (defmethod asymbol ((o ometa-parser))
    (let ((s nil))
      (core-or o
