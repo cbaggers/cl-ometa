@@ -155,14 +155,15 @@
 
 
 (defmethod core-form ((o ometa-base) fun)
-  (let ((v (core-apply o 'anything)))
-    (core-pred o (listp v))
-    (let ((next-input (ometa-input o)))
-      (setf (ometa-input o) (make-ometa-stream v))
-      (let ((res (funcall fun)))
-        (core-apply o 'end)
-        (setf (ometa-input o) next-input)
-        res))))
+  (let ((current-input (ometa-input o)))
+    (let ((v (core-apply o 'anything)))
+      (core-pred o (listp v))
+      (let ((next-input (ometa-input o)))
+        (setf (ometa-input o) (stream-branch current-input))
+        (let ((res (funcall fun)))
+          (core-apply o 'end)
+          (setf (ometa-input o) next-input)
+          res)))))
     
 
 

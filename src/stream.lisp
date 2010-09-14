@@ -31,6 +31,7 @@
            :accessor stream-current-line)
    (tail   :initarg :tail
            :initform nil)
+   (branch :initform nil)
    (memo   :initform (make-hash-table)
            :accessor stream-memo)
    (errors :initform (list)
@@ -111,6 +112,12 @@
 (defmethod stream-length ((s ometa-stream))
   (s-size (stream-input s)))
 
+(defmethod stream-branch ((s ometa-stream))
+  (let ((next (make-ometa-stream (stream-head s))))
+    (setf (slot-value s 'branch) next)
+    next))
+  
+
 (defmethod stream-current-phrase ((s ometa-stream))
   (let* ((input (subseq (stream-input s) (stream-index s)))
          (str (if (stringp input)
@@ -118,18 +125,31 @@
                   (format nil "~w" input)))
          (len (array-total-size str))
          (phrase (subseq str
-                         0 (if (< len 20) len 20))))
+                         0 (if (< len 30) len 30))))
     (concatenate 'string "'" (substitute #\Space #\Newline phrase)  "...'")))
 
 (defmethod stream-farthest-error-element ((s ometa-stream))
-  (labels ((lookup (cur)
-             (let ((tail (slot-value cur 'tail)))
-               (if tail
-                   (let ((res (lookup tail)))
-                     (if (stream-errors res) res cur))
-                   cur))))
-    (lookup s)))
+  (labels ((lookup (c)
+             (if (null c)
+                 nil
+                 (progn
+                   (let ((tail (lookup (slot-value c 'tail))))
+                     (let ((last (if tail tail c)))
+                       (let ((b (slot-value last 'branch)))
+                         (if b
+                             (let ((fb (stream-farthest-error-element b)))
+                             (if (eq fb last)
+                                 (if (stream-errors last)
+                                     last
+                                     nil)
+                                 fb))
+                             (if (stream-errors last)
+                                 last
+                               nil)))))))))
+    (let ((res (lookup s)))
+      (if res res s))))
 
+ 
 ;; must check 2-ahead. basic rule "anything
 ;; ends up creating a tail for the current element
 (defmethod stream-ahead2-p ((s ometa-stream))
@@ -149,12 +169,12 @@
 
 (defmethod stream-add-error ((s ometa-stream) rule)
   (let ((real-s (stream-next-from-input s)))
-    (let ((hd (if (eq real-s s) nil (stream-head s))))
+    (let ((hd (if (eq real-s s) nil (stream-head s)))) ;; I really can't remember what is this
       (if (stream-ahead2-p real-s) ; we are the farthest scanned. 
                                    ; substitute current errors with the new one
           (setf (slot-value real-s 'errors) (cons rule hd))))))
           ;; this is not the farthest error. join the errors
-          ;;(setf (slot-value real-s 'errors) (cons (cons rule hd) (slot-value real-s 'errors)))))))
+          ;(setf (slot-value real-s 'errors) (cons (cons rule hd) (slot-value real-s 'errors)))))))
 
 (defmethod stream-get-pretty-error ((s ometa-stream))
   (let* ((last (stream-farthest-error-element s))
