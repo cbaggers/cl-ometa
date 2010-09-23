@@ -183,14 +183,13 @@
    (let ((ac nil) (c nil) (args nil))
      (core-or o
               (lambda ()
-                (core-or o
+                (core-or o (lambda () (progn (core-apply o 'action)))
                          (lambda ()
                            (progn
                             (let ((res (core-apply-with-args o 'exactly #\=)))
                               (core-apply o 'spaces)
                               res)
                             (core-apply o 'choices)))
-                         (lambda () (progn (core-apply o 'action)))
                          (lambda ()
                            (progn
                             (setq args

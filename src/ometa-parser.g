@@ -77,8 +77,8 @@ ometa ometa-parser {
 
   rule-part :rn = rule-name:rname %(eq rname rn) rule-rest:r ";" => r;
 
-  rule-rest = "=" choices
-            |  action
+  rule-rest =  action
+            |  "="  choices
             |  argument+:args "=" choices:c => `(and ,@args ,c)
             |  argument+:args  action:ac      => `(and ,@args ,ac)
             ;
