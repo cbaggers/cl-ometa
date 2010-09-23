@@ -29,17 +29,21 @@
 (defmethod ometa-stream-head ((o ometa-base))
   (stream-head (ometa-input o)))
 
+(defmethod o-init ((o ometa-base)) nil)
 
-(defun ometa-match (data grammar rule)
-  (let ((bk-nil-print (pprint-dispatch nil))) ;; TODO: use dynamic scope?
-    (set-pprint-dispatch (type-of nil) #'nil-paren-print)
-    (let* ((input (make-ometa-stream data))
-           (o (make-instance grammar :input input))
-           (res (catch 'ometa (core-apply o rule))))
-      (set-pprint-dispatch (type-of nil) bk-nil-print)
-      (if (ometa-error-p res)
-          (values 'error (stream-get-pretty-error input))
-          (values t res)))))
+(defun ometa-match (data grammar rule &rest r)
+  (let ((bk-nil-print (pprint-dispatch nil)))
+    (unwind-protect
+         (progn
+           (set-pprint-dispatch (type-of nil) #'nil-paren-print)
+           (let* ((input (make-ometa-stream data))
+                  (o (apply #'make-instance (cons grammar (append r (list :input input))))))
+             (o-init o)
+             (let ((res (catch 'ometa (core-apply o rule))))
+               (if (ometa-error-p res)
+                   (values 'error (stream-get-pretty-error input))
+                   (values t res)))))
+      (set-pprint-dispatch (type-of nil) bk-nil-print))))
 
 
 
