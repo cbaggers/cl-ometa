@@ -1,0 +1,48 @@
+-- Token match:
+     string-object match is not working.
+     (eq "oi" "oi") -> NIL
+ 
+
+
+-- Error reporting for s-expr matching
+   A warning: line numbers are not computed, since s-expr doesnt have them
+              Plus, we should avoid computing line++ when seeing a #\Newline
+              when matching s-exprs.
+   A problem: the algorithm for computing the error messages doesn't work
+              with s-expr matching.
+              Text matching incurrs in a linear stream, only branching
+              when calling match-with-args (which adds a branch for args),
+              which allow us to navigate the head/tail and check for
+              the most relevant erros.
+              S-expr matching incurrs in a lot of branches (through
+              rule "form") that are not associated with any stream object.
+              Consider:
+               ((A (b c) (d e)) F)
+
+              From stream object "(A..)" we can't go to b,c,d or e.
+              The tail of "(A.." is "F".
+
+
+-foreign call
+-initialization rule/method / ctor
+
+- action as template
+  extend the ometa-parser to suppor textual expansion
+  (instead of only macro expansion), something like:
+
+  func-decl = identifier:x params:p body:y 
+          [[
+            % /*some native code here, like loops and so on*/ %
+
+            function $x (${ (interpolate p ",") }) {
+               $( (pretty-and-indent y ) )
+            }
+          ]];
+ 
+-- Ease acess to local vars:
+    - Define the slot "fields", initform: (make-hash-table) 
+      in ometa-base
+    - defmethod (get-field ometa-base field-name)
+      defmethdo (set-field ometa-base field-name value)
+ -> remove the rule _slots in the parser definition
+
