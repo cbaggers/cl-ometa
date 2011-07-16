@@ -1,22 +1,24 @@
 ;; Copyright (c) 2010 Thiago Silva <thiago@comum.org>
 
-;; Permission is hereby granted, free of charge, to any person obtaining a copy
-;; of this software and associated documentation files (the "Software"), to deal
-;; in the Software without restriction, including without limitation the rights
-;; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-;; copies of the Software, and to permit persons to whom the Software is
-;; furnished to do so, subject to the following conditions:
+;; Permission is hereby granted, free of charge, to any person obtaining
+;; a copy of this software and associated documentation files (the
+;; "Software"), to deal in the Software without restriction, including
+;; without limitation the rights to use, copy, modify, merge, publish,
+;; distribute, sublicense, and/or sell copies of the Software, and to
+;; permit persons to whom the Software is furnished to do so, subject to
+;; the following conditions:
 
-;; The above copyright notice and this permission notice shall be included in
-;; all copies or substantial portions of the Software.
+;; The above copyright notice and this permission notice shall be
+;; included in all copies or substantial portions of the Software.
 
-;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-;; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-;; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-;; THE SOFTWARE.
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+;; NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+;; BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+;; ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+;; SOFTWARE.
 
 (defclass ometa-base ()
   ((input  :accessor ometa-input
@@ -37,7 +39,8 @@
          (progn
            (set-pprint-dispatch (type-of nil) #'nil-paren-print)
            (let* ((input (make-ometa-stream data))
-                  (o (apply #'make-instance (cons grammar (append r (list :input input))))))
+                  (o (apply #'make-instance (cons grammar (append
+                  r (list :input input))))))
              (o-init o)
              (let ((res (catch 'ometa (core-apply o rule))))
                (if (ometa-error-p res)
@@ -279,7 +282,8 @@
     res))
 
 (defmethod token ((o ometa-base))
-  (coerce (core-apply-with-args o 'first-and-rest 'letter 'alpha-char) 'string))
+  (coerce (core-apply-with-args o 'first-and-rest 'letter 'alpha-char)
+          'string))
 
 (defmethod token-s ((o ometa-base))
   (let ((k (core-apply o 'token)))
