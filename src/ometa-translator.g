@@ -43,7 +43,7 @@ ometa ometa-translator <: ometa-base {
 
   rules = rule+;
 
-  rule = (#rule an-atom:rname choice:p) 
+  rule = (#rule an-atom:rname choice:p)
           => (let ((locals (gethash rname (ometa-local-variables o))))
                      (let ((m `(defmethod ,rname ((o ,(grammar-name o))))))
                        (if (null locals)
@@ -81,7 +81,7 @@ ometa ometa-translator <: ometa-base {
              ;
 
   apply-operation = (#apply an-atom:s) => `(core-apply o ',s);
-  
+
   apply-super-operation = (#apply-super an-atom) => `(call-next-method o);
 
   apply-with-args-operation = (#apply-with-args an-atom:r (#arguments {an-atom|(#symbol an-atom:k => `',k)}*:a))

@@ -2,7 +2,7 @@
 
  (defclass ometa-translator (ometa-base)
            ((grammar-name :accessor grammar-name :initform nil)
-            (local-variables :accessor ometa-local-variables))) 
+            (local-variables :accessor ometa-local-variables)))
  (defmethod ometa ((o ometa-translator))
    (let ((r nil) (ic nil) (sl nil) (i nil) (name nil))
      (core-or o
@@ -24,7 +24,7 @@
                             (core-apply o 'end)
                             (if ic
                                 `((defclass ,name (,i) ,sl) ,@ic ,@r)
-                                `((defclass ,name (,i) ,sl) ,@r))))))))) 
+                                `((defclass ,name (,i) ,sl) ,@r)))))))))
  (defmethod inheritance ((o ometa-translator))
    (core-or o
             (lambda ()
@@ -36,7 +36,7 @@
                                        (progn
                                         (core-apply-with-args o 'exactly
                                                               'parent)
-                                        (core-apply o 'an-atom)))))))))) 
+                                        (core-apply o 'an-atom))))))))))
  (defmethod locals ((o ometa-translator))
    (let ((lst nil) (vars nil) (rname nil))
      (core-or o
@@ -87,7 +87,7 @@
                                                                                      `(,rname
                                                                                        ,@vars))))))))))))))))
                             (setf (ometa-local-variables o)
-                                    (list->hash-table lst))))))))) 
+                                    (list->hash-table lst)))))))))
  (defmethod slots ((o ometa-translator))
    (let ((s nil))
      (core-or o
@@ -111,7 +111,7 @@
                                                      (progn
                                                       (core-apply-with-args o
                                                                             'exactly
-                                                                            'nil)))))))))))))) 
+                                                                            'nil))))))))))))))
  (defmethod inline-code ((o ometa-translator))
    (let ((s nil))
      (core-or o
@@ -136,14 +136,14 @@
                                                      (progn
                                                       (core-apply-with-args o
                                                                             'exactly
-                                                                            'nil)))))))))))))) 
+                                                                            'nil))))))))))))))
  (defmethod rules ((o ometa-translator))
    (core-or o
             (lambda ()
               (core-or o
                        (lambda ()
                          (progn
-                          (core-many1 o (lambda () (core-apply o 'rule))))))))) 
+                          (core-many1 o (lambda () (core-apply o 'rule)))))))))
  (defmethod rule ((o ometa-translator))
    (let ((p nil) (rname nil))
      (core-or o
@@ -173,7 +173,7 @@
                                       (append m
                                               (list
                                                (append llet
-                                                       (list p))))))))))))))) 
+                                                       (list p)))))))))))))))
  (defmethod choice ((o ometa-translator))
    (let ((p nil))
      (core-or o
@@ -215,7 +215,7 @@
                                       ,@(map 'list
                                              (lambda (x) `(lambda ,nil ,x))
                                              p))))
-                         (lambda () (progn (core-apply o 'pattern)))))))) 
+                         (lambda () (progn (core-apply o 'pattern))))))))
  (defmethod pattern ((o ometa-translator))
    (let ((ac nil) (e nil) (a nil))
      (core-or o
@@ -240,7 +240,7 @@
                                                                 'action)
                                           (setq ac (core-apply o 'str)))))
                             (read-from-string ac)))
-                         (lambda () (progn (core-apply o 'expression)))))))) 
+                         (lambda () (progn (core-apply o 'expression))))))))
  (defmethod expression ((o ometa-translator))
    (core-or o
             (lambda ()
@@ -261,7 +261,7 @@
                        (lambda () (progn (core-apply o 'string-eq-operation)))
                        (lambda () (progn (core-apply o 'predicate)))
                        (lambda ()
-                         (progn (core-apply o 'lookahead-operation))))))) 
+                         (progn (core-apply o 'lookahead-operation)))))))
  (defmethod apply-operation ((o ometa-translator))
    (let ((s nil))
      (core-or o
@@ -275,7 +275,7 @@
                                           (core-apply-with-args o 'exactly
                                                                 'apply)
                                           (setq s (core-apply o 'an-atom)))))
-                            `(core-apply o ',s)))))))) 
+                            `(core-apply o ',s))))))))
  (defmethod apply-super-operation ((o ometa-translator))
    (core-or o
             (lambda ()
@@ -288,7 +288,7 @@
                                         (core-apply-with-args o 'exactly
                                                               'apply-super)
                                         (core-apply o 'an-atom))))
-                          '(call-next-method o))))))) 
+                          '(call-next-method o)))))))
  (defmethod apply-with-args-operation ((o ometa-translator))
    (let ((a nil) (k nil) (r nil))
      (core-or o
@@ -337,7 +337,7 @@
                                                                                               o
                                                                                               'an-atom))
                                                                                      `',k)))))))))))))))
-                            `(core-apply-with-args o ',r ,@a)))))))) 
+                            `(core-apply-with-args o ',r ,@a))))))))
  (defmethod seq-operation ((o ometa-translator))
    (let ((s nil))
      (core-or o
@@ -372,7 +372,7 @@
                                    res)
                                 `(core-apply-with-args o 'seq-s
                                                        ',(concatenate 'list
-                                                                      s)))))))))) 
+                                                                      s))))))))))
  (defmethod many-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -388,7 +388,7 @@
                                           (setq x (core-apply o 'choice)))))
                             (if (listp (car x))
                                 `(core-many o (lambda ,nil ,@x))
-                                `(core-many o (lambda ,nil ,x)))))))))) 
+                                `(core-many o (lambda ,nil ,x))))))))))
  (defmethod many1-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -404,7 +404,7 @@
                                           (setq x (core-apply o 'choice)))))
                             (if (listp (car x))
                                 `(core-many1 o (lambda ,nil ,@x))
-                                `(core-many1 o (lambda ,nil ,x)))))))))) 
+                                `(core-many1 o (lambda ,nil ,x))))))))))
  (defmethod not-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -420,7 +420,7 @@
                                           (setq x (core-apply o 'choice)))))
                             (if (listp (car x))
                                 `(core-not o (lambda ,nil ,@x))
-                                `(core-not o (lambda ,nil ,x)))))))))) 
+                                `(core-not o (lambda ,nil ,x))))))))))
  (defmethod lookahead-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -436,7 +436,7 @@
                                           (setq x (core-apply o 'choice)))))
                             (if (listp (car x))
                                 `(core-lookahead o (lambda ,nil ,@x))
-                                `(core-lookahead o (lambda ,nil ,x)))))))))) 
+                                `(core-lookahead o (lambda ,nil ,x))))))))))
  (defmethod optional-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -452,7 +452,7 @@
                                           (setq x (core-apply o 'choice)))))
                             (if (listp (car x))
                                 `(core-opt o (lambda ,nil ,@x))
-                                `(core-opt o (lambda ,nil ,x)))))))))) 
+                                `(core-opt o (lambda ,nil ,x))))))))))
  (defmethod repeat-operation ((o ometa-translator))
    (let ((x nil) (n nil))
      (core-or o
@@ -469,7 +469,7 @@
                                           (setq x (core-apply o 'choice)))))
                             (if (listp (car x))
                                 `(core-repeat o ,n (lambda ,nil ,@x))
-                                `(core-repeat o ,n (lambda ,nil ,x)))))))))) 
+                                `(core-repeat o ,n (lambda ,nil ,x))))))))))
  (defmethod form-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -483,7 +483,7 @@
                                           (core-apply-with-args o 'exactly
                                                                 'form)
                                           (setq x (core-apply o 'choice)))))
-                            `(core-form o (lambda ,nil ,x))))))))) 
+                            `(core-form o (lambda ,nil ,x)))))))))
  (defmethod symbol-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -497,7 +497,7 @@
                                           (core-apply-with-args o 'exactly
                                                                 'symbol)
                                           (setq x (core-apply o 'an-atom)))))
-                            `(core-apply-with-args o 'exactly ',x)))))))) 
+                            `(core-apply-with-args o 'exactly ',x))))))))
  (defmethod number-operation ((o ometa-translator))
    (let ((x nil))
      (core-or o
@@ -511,7 +511,7 @@
                                           (core-apply-with-args o 'exactly
                                                                 'number)
                                           (setq x (core-apply o 'an-atom)))))
-                            `(core-apply-with-args o 'exactly ,x)))))))) 
+                            `(core-apply-with-args o 'exactly ,x))))))))
  (defmethod string-eq-operation ((o ometa-translator))
    (let ((s nil))
      (core-or o
@@ -525,7 +525,7 @@
                                           (core-apply-with-args o 'exactly
                                                                 'string-eq)
                                           (setq s (core-apply o 'str)))))
-                            `(core-apply-with-args o 'str-eq ,s)))))))) 
+                            `(core-apply-with-args o 'str-eq ,s))))))))
  (defmethod predicate ((o ometa-translator))
    (let ((s nil))
      (core-or o
@@ -539,7 +539,7 @@
                                           (core-apply-with-args o 'exactly
                                                                 'sem-predicate)
                                           (setq s (core-apply o 'str)))))
-                            `(core-pred o ,(read-from-string s))))))))) 
+                            `(core-pred o ,(read-from-string s)))))))))
  (defmethod an-atom ((o ometa-translator))
    (let ((a nil))
      (core-or o
@@ -550,5 +550,4 @@
                             (setq a (core-apply o 'anything))
                             (progn
                              (core-pred o (or (symbolp a) (numberp a)))
-                             a)))))))) 
- 
+                             a))))))))

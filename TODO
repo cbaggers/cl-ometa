@@ -1,7 +1,7 @@
 -- Token match:
      string-object match is not working.
      (eq "oi" "oi") -> NIL
- 
+
 
 
 -- Error reporting for s-expr matching
@@ -30,7 +30,7 @@
   extend the ometa-parser to suppor textual expansion
   (instead of only macro expansion), something like:
 
-  func-decl = identifier:x params:p body:y 
+  func-decl = identifier:x params:p body:y
           [[
             % /*some native code here, like loops and so on*/ %
 
@@ -38,9 +38,9 @@
                $( (pretty-and-indent y ) )
             }
           ]];
- 
+
 -- Ease acess to local vars:
-    - Define the slot "fields", initform: (make-hash-table) 
+    - Define the slot "fields", initform: (make-hash-table)
       in ometa-base
     - defmethod (get-field ometa-base field-name)
       defmethdo (set-field ometa-base field-name value)

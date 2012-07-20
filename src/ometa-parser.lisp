@@ -3,19 +3,19 @@
  (defclass ometa-parser (ometa-base)
            ((current-rule :initform nil :accessor ometa-current-rule)
             (local-variables :initform (make-hash-table) :accessor
-             ometa-local-variables))) 
+             ometa-local-variables)))
  (defmethod ometa-add-local-var ((o ometa-parser) var)
    (let* ((rule (ometa-current-rule o))
           (vars (gethash rule (ometa-local-variables o))))
      (if (eq var 'o)
          (throw 'ometa "variable 'o' conflicts with internal 'o' var."))
      (unless (find var vars)
-       (push var (gethash rule (ometa-local-variables o)))))) 
+       (push var (gethash rule (ometa-local-variables o))))))
  (defmethod ometa-local-variables-list ((o ometa-parser))
    (let ((res nil))
      (maphash (lambda (k v) (setq res (cons (list k v) res)))
               (ometa-local-variables o))
-     res)) 
+     res))
  (defmethod spacing ((o ometa-parser))
    (core-or o
             (lambda ()
@@ -36,7 +36,7 @@
                                                    (core-apply o
                                                                'anything))))))
                           (core-apply-with-args o 'seq '(#\* #\/))))
-                       (lambda () (progn (call-next-method o))))))) 
+                       (lambda () (progn (call-next-method o)))))))
  (defmethod ometa ((o ometa-parser))
    (let ((r nil) (ic nil) (sl nil) (i nil) (name nil))
      (core-or o
@@ -61,7 +61,7 @@
                             (core-apply o 'end)
                             `(grammar ,name ,i
                               (locals ,(ometa-local-variables-list o))
-                              (slots ,sl) (inline ,ic) ,@r)))))))) 
+                              (slots ,sl) (inline ,ic) ,@r))))))))
  (defmethod inheritance ((o ometa-parser))
    (let ((i nil))
      (core-or o
@@ -72,7 +72,7 @@
                             (core-apply-with-args o 'seq-s '(#\< #\:))
                             (setq i (core-apply o 'identifier))
                             `(parent ,i)))
-                         (lambda () (progn '(parent ometa-base)))))))) 
+                         (lambda () (progn '(parent ometa-base))))))))
  (defmethod cl-slots ((o ometa-parser))
    (let ((s nil))
      (core-or o
@@ -101,7 +101,7 @@
                               (core-apply o 'spaces)
                               res)
                             (concatenate 'string s)))
-                         (lambda () 'nil)))))) 
+                         (lambda () 'nil))))))
  (defmethod inline-code ((o ometa-parser))
    (let ((c nil))
      (core-or o
@@ -133,14 +133,14 @@
                               (core-apply o 'spaces)
                               res)
                             (concatenate 'string c)))
-                         (lambda () 'nil)))))) 
+                         (lambda () 'nil))))))
  (defmethod rules ((o ometa-parser))
    (core-or o
             (lambda ()
               (core-or o
                        (lambda ()
                          (progn
-                          (core-many1 o (lambda () (core-apply o 'rule))))))))) 
+                          (core-many1 o (lambda () (core-apply o 'rule)))))))))
  (defmethod rule ((o ometa-parser))
    (let ((p nil) (rname nil))
      (core-or o
@@ -162,7 +162,7 @@
                                                   (core-apply-with-args o
                                                                         'rule-part
                                                                         rname))))
-                            `(rule ,rname (or ,@p))))))))) 
+                            `(rule ,rname (or ,@p)))))))))
  (defmethod rule-part ((o ometa-parser))
    (let ((r nil) (rname nil) (rn nil))
      (core-or o
@@ -178,7 +178,7 @@
                              (let ((res (core-apply-with-args o 'exactly #\;)))
                                (core-apply o 'spaces)
                                res)
-                             r)))))))) 
+                             r))))))))
  (defmethod rule-rest ((o ometa-parser))
    (let ((ac nil) (c nil) (args nil))
      (core-or o
@@ -208,7 +208,7 @@
                                                 (lambda ()
                                                   (core-apply o 'argument))))
                             (setq ac (core-apply o 'action))
-                            `(and ,@args ,ac)))))))) 
+                            `(and ,@args ,ac))))))))
  (defmethod rule-name ((o ometa-parser))
    (let ((rname nil))
      (core-or o
@@ -219,7 +219,7 @@
                             (setq rname (core-apply o 'identifier))
                             (progn
                              (setf (ometa-current-rule o) rname)
-                             rname)))))))) 
+                             rname))))))))
  (defmethod argument ((o ometa-parser))
    (let ((b nil))
      (core-or o
@@ -228,7 +228,7 @@
                          (lambda ()
                            (progn
                             (setq b (core-apply o 'binding))
-                            `(bind ,b (apply anything))))))))) 
+                            `(bind ,b (apply anything)))))))))
  (defmethod choices ((o ometa-parser))
    (let ((xs nil) (c nil) (x nil))
      (core-or o
@@ -255,7 +255,7 @@
                                                                       o
                                                                       'choice))
                                                              c))))))
-                            `(or ,x ,@xs)))))))) 
+                            `(or ,x ,@xs))))))))
  (defmethod choice ((o ometa-parser))
    (let ((ac nil) (x nil))
      (core-or o
@@ -277,13 +277,13 @@
                                                (lambda ()
                                                  (core-apply o
                                                              'top-expression))))
-                            `(and ,@x)))))))) 
+                            `(and ,@x))))))))
  (defmethod top-expression ((o ometa-parser))
    (core-or o
             (lambda ()
               (core-or o (lambda () (progn (core-apply o 'bind-expression)))
                        (lambda ()
-                         (progn (core-apply o 'repeated-expression))))))) 
+                         (progn (core-apply o 'repeated-expression)))))))
  (defmethod bind-expression ((o ometa-parser))
    (let ((b nil) (e nil))
      (core-or o
@@ -293,7 +293,7 @@
                            (progn
                             (setq e (core-apply o 'repeated-expression))
                             (setq b (core-apply o 'binding))
-                            `(bind ,b ,e)))))))) 
+                            `(bind ,b ,e))))))))
  (defmethod repeated-expression ((o ometa-parser))
    (let ((rep nil) (e nil))
      (core-or o
@@ -327,7 +327,7 @@
                             (setq rep (core-apply o 'str-number))
                             (core-apply-with-args o 'exactly #\])
                             `(repeat ,rep ,e)))
-                         (lambda () (progn (core-apply o 'term)))))))) 
+                         (lambda () (progn (core-apply o 'term))))))))
  (defmethod term ((o ometa-parser))
    (let ((e nil))
      (core-or o
@@ -343,7 +343,7 @@
                             (core-apply-with-args o 'exactly #\&)
                             (setq e (core-apply o 'element))
                             `(lookahead ,e)))
-                         (lambda () (progn (core-apply o 'element)))))))) 
+                         (lambda () (progn (core-apply o 'element))))))))
  (defmethod binding ((o ometa-parser))
    (let ((i nil))
      (core-or o
@@ -353,7 +353,7 @@
                            (progn
                             (core-apply-with-args o 'exactly #\:)
                             (setq i (core-apply o 'identifier))
-                            (progn (ometa-add-local-var o i) i)))))))) 
+                            (progn (ometa-add-local-var o i) i))))))))
  (defmethod element ((o ometa-parser))
    (let ((c nil) (s nil))
      (core-or o
@@ -374,7 +374,7 @@
                             (let ((res (core-apply-with-args o 'exactly #\})))
                               (core-apply o 'spaces)
                               res)
-                            c))))))) 
+                            c)))))))
  (defmethod data-element ((o ometa-parser))
    (core-or o
             (lambda ()
@@ -385,7 +385,7 @@
                        (lambda () (progn (core-apply o 's-expr)))
                        (lambda () (progn (core-apply o 'any-symb)))
                        (lambda () (progn (core-apply o 'end-symb)))
-                       (lambda () (progn (core-apply o 's-number))))))) 
+                       (lambda () (progn (core-apply o 's-number)))))))
  (defmethod action ((o ometa-parser))
    (let ((s nil))
      (core-or o
@@ -395,7 +395,7 @@
                            (progn
                             (core-apply-with-args o 'seq-s '(#\= #\>))
                             (setq s (core-apply o 'host-lang-expr))
-                            `(action ,s)))))))) 
+                            `(action ,s))))))))
  (defmethod host-lang-expr ((o ometa-parser))
    (let ((s nil) (e nil) (q nil))
      (core-or o
@@ -406,7 +406,7 @@
                             (setq q (core-apply o 'host-lang-quote))
                             (setq e (core-apply o 'host-lang-expand))
                             (setq s (core-apply o 'host-lang-s-expr))
-                            (str-trim (concatenate 'string q e s))))))))) 
+                            (str-trim (concatenate 'string q e s)))))))))
  (defmethod host-lang-quote ((o ometa-parser))
    (let ((q nil))
      (core-or o
@@ -433,7 +433,7 @@
                                                                o 'exactly
                                                                #\'))))
                                         (coerce q 'string)))
-                                     (lambda () (progn "")))))))))) 
+                                     (lambda () (progn ""))))))))))
  (defmethod host-lang-expand ((o ometa-parser))
    (let ((aa nil) (a nil) (qq nil) (q nil))
      (core-or o
@@ -464,7 +464,7 @@
                                                                               #\@))
                                                 (string a)))
                                              (lambda () (progn ""))))
-                            (concatenate 'string qq aa)))))))) 
+                            (concatenate 'string qq aa))))))))
  (defmethod host-lang-s-expr ((o ometa-parser))
    (let ((x nil))
      (core-or o
@@ -497,7 +497,7 @@
                                                 (concatenate 'string a " " b))
                                               x)
                                              ") ")
-                                " () ")))))))) 
+                                " () "))))))))
  (defmethod host-lang-atom ((o ometa-parser))
    (let ((a nil) (e nil) (q nil))
      (core-or o
@@ -513,7 +513,7 @@
                                                (progn
                                                 (core-apply o
                                                             's-identifier)))))
-                            (concatenate 'string q e a)))))))) 
+                            (concatenate 'string q e a))))))))
  (defmethod s-identifier ((o ometa-parser))
    (let ((xs nil) (c nil))
      (core-or o
@@ -585,7 +585,7 @@
                                                                        o 'chr))
                                                               c))))))
                             (core-apply o 'spaces)
-                            (coerce xs 'string)))))))) 
+                            (coerce xs 'string))))))))
  (defmethod prod-app ((o ometa-parser))
    (let ((args nil) (p nil))
      (core-or o
@@ -630,7 +630,7 @@
                               (core-apply o 'spaces)
                               res)
                             `(apply-super-with-args ,(ometa-current-rule o)
-                              (arguments ,@args))))))))) 
+                              (arguments ,@args)))))))))
  (defmethod prod-arg-list ((o ometa-parser))
    (let ((xs nil) (a nil) (x nil))
      (core-or o
@@ -657,12 +657,12 @@
                                                                       o
                                                                       'prod-arg))
                                                              a))))))
-                            (cons x xs)))))))) 
+                            (cons x xs))))))))
  (defmethod prod-arg ((o ometa-parser))
    (core-or o
             (lambda ()
               (core-or o (lambda () (progn (core-apply o 'data-element)))
-                       (lambda () (progn (core-apply o 'identifier))))))) 
+                       (lambda () (progn (core-apply o 'identifier)))))))
  (defmethod char-sequence ((o ometa-parser))
    (let ((cs nil) (c nil))
      (core-or o
@@ -705,7 +705,7 @@
                             (let ((res (core-apply-with-args o 'exactly #\')))
                               (core-apply o 'spaces)
                               res)
-                            `(seq ,(coerce cs 'string))))))))) 
+                            `(seq ,(coerce cs 'string)))))))))
  (defmethod char-sequence-s ((o ometa-parser))
    (let ((cs nil) (c nil))
      (core-or o
@@ -746,7 +746,7 @@
                             (let ((res (core-apply-with-args o 'exactly #\")))
                               (core-apply o 'spaces)
                               res)
-                            `(seq-s ,(coerce cs 'string))))))))) 
+                            `(seq-s ,(coerce cs 'string)))))))))
  (defmethod string-object ((o ometa-parser))
    (let ((cs nil) (c nil))
      (core-or o
@@ -774,7 +774,7 @@
                                                                       o 'chr))
                                                              c))))))
                             (core-apply-with-args o 'seq-s '(#\' #\'))
-                            `(string-eq ,(coerce cs 'string))))))))) 
+                            `(string-eq ,(coerce cs 'string)))))))))
  (defmethod asymbol ((o ometa-parser))
    (let ((s nil))
      (core-or o
@@ -784,7 +784,7 @@
                            (progn
                             (core-apply-with-args o 'exactly #\#)
                             (setq s (core-apply o 'identifier))
-                            `(symbol ,s)))))))) 
+                            `(symbol ,s))))))))
  (defmethod s-expr ((o ometa-parser))
    (let ((s nil))
      (core-or o
@@ -799,7 +799,7 @@
                             (let ((res (core-apply-with-args o 'exactly #\))))
                               (core-apply o 'spaces)
                               res)
-                            `(form ,s)))))))) 
+                            `(form ,s))))))))
  (defmethod la-prefix ((o ometa-parser))
    (core-or o
             (lambda ()
@@ -808,7 +808,7 @@
                          (progn
                           (let ((res (core-apply-with-args o 'exactly #\&)))
                             (core-apply o 'spaces)
-                            res))))))) 
+                            res)))))))
  (defmethod not-prefix ((o ometa-parser))
    (core-or o
             (lambda ()
@@ -817,7 +817,7 @@
                          (progn
                           (let ((res (core-apply-with-args o 'exactly #\~)))
                             (core-apply o 'spaces)
-                            res))))))) 
+                            res)))))))
  (defmethod sem-prefix ((o ometa-parser))
    (core-or o
             (lambda ()
@@ -826,7 +826,7 @@
                          (progn
                           (let ((res (core-apply-with-args o 'exactly #\%)))
                             (core-apply o 'spaces)
-                            res))))))) 
+                            res)))))))
  (defmethod end-symb ((o ometa-parser))
    (core-or o
             (lambda ()
@@ -836,7 +836,7 @@
                           (let ((res (core-apply-with-args o 'exactly #\$)))
                             (core-apply o 'spaces)
                             res)
-                          '(apply end))))))) 
+                          '(apply end)))))))
  (defmethod any-symb ((o ometa-parser))
    (core-or o
             (lambda ()
@@ -846,7 +846,7 @@
                           (let ((res (core-apply-with-args o 'exactly #\_)))
                             (core-apply o 'spaces)
                             res)
-                          '(apply anything))))))) 
+                          '(apply anything)))))))
  (defmethod s-number ((o ometa-parser))
    (let ((n nil))
      (core-or o
@@ -855,5 +855,4 @@
                          (lambda ()
                            (progn
                             (setq n (core-apply o 'num))
-                            `(number ,n)))))))) 
- 
+                            `(number ,n))))))))

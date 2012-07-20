@@ -24,7 +24,7 @@
   ((input  :accessor ometa-input
            :initarg :input)))
 
-  
+
 (defmethod ometa-current-pos ((o ometa-base))
   (stream-index (ometa-input o)))
 
@@ -77,7 +77,7 @@
   (core-apply o rule))
 
 (defmethod core-prepend-input ((o ometa-base) value)
-  (setf (ometa-input o) 
+  (setf (ometa-input o)
         (make-ometa-stream-with value (ometa-input o))))
 
 (defmethod core-pred ((o ometa-base) x)
@@ -123,14 +123,14 @@
 (defmethod core-opt ((o ometa-base) fun)
   (let* ((orig-input (ometa-input o))
          (r (catch 'ometa (funcall fun))))
-    (if (ometa-error-p r)         
+    (if (ometa-error-p r)
         (progn
           (setf (ometa-input o) orig-input)
           nil)
         r)))
 
 ;; many fun
-;;  while (fun) accumulate results. returns result list    
+;;  while (fun) accumulate results. returns result list
 (defmethod core-many ((o ometa-base) fun &optional first)
   (let ((res (if first (list first) (list))))
     (loop
@@ -150,7 +150,7 @@
 
 (defmethod core-repeat ((o ometa-base) times fun)
   (let ((res (list)))
-    (do ((i 0 (+ 1 i))) ((= times i)) 
+    (do ((i 0 (+ 1 i))) ((= times i))
       (let* ((orig-input (ometa-input o))
              (r (catch 'ometa (funcall fun))))
         (if (ometa-error-p r)
@@ -171,7 +171,7 @@
           (core-apply o 'end)
           (setf (ometa-input o) next-input)
           res)))))
-    
+
 
 
 ;; basic rules
@@ -234,8 +234,8 @@
     r))
 
 (defmethod str-number ((o ometa-base))
-  (let ((ds (core-many1 o 
-                        (lambda () 
+  (let ((ds (core-many1 o
+                        (lambda ()
                           (core-apply o 'digit)))))
     (parse-integer (concatenate 'string ds))))
 
@@ -250,10 +250,10 @@
     r))
 
 (defmethod letter ((o ometa-base))
-  (core-or o 
+  (core-or o
            (lambda () (core-apply o 'lower))
            (lambda () (core-apply o 'upper))))
-           
+
 (defmethod letter-or-digit ((o ometa-base))
   (core-or o
            (lambda () (core-apply o 'letter))

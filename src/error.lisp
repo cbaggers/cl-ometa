@@ -27,4 +27,3 @@
 
 (defun ometa-error-p (x)
   (eq (class-name (class-of x)) 'ometa-error-type))
-

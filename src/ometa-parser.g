@@ -24,7 +24,7 @@ ometa ometa-parser {
 
     /* current-rule and local-variables slots */
 
-  _slots ((current-rule    :initform nil 
+  _slots ((current-rule    :initform nil
            :accessor ometa-current-rule)
           (local-variables :initform (make-hash-table)
            :accessor ometa-local-variables));
@@ -39,7 +39,7 @@ ometa ometa-parser {
                 (throw 'ometa "variable 'o' conflicts with internal 'o' var."))
              (unless (find var vars)
               (push var (gethash rule (ometa-local-variables o))))))
-           
+
            (defmethod ometa-local-variables-list ((o ometa-parser))
             (let ((res nil))
              (maphash (lambda (k v) (setq res (cons (list k v) res))) (ometa-local-variables o))
@@ -50,8 +50,8 @@ ometa ometa-parser {
           ;
 
   ometa = spaces "ometa" identifier:name inheritance:i  "{"
-              cl-slots:sl inline-code:ic 
-              rules:r 
+              cl-slots:sl inline-code:ic
+              rules:r
           "}" $
           => `(grammar ,name ,i (locals ,(ometa-local-variables-list o))
                                 (slots ,sl)
@@ -134,14 +134,14 @@ ometa ometa-parser {
                |  any-symb
                |  end-symb
                |  s-number
-               ; 
+               ;
 
   action     = "=>" host-lang-expr:s => `(action ,s);
 
 
-  host-lang-expr  = host-lang-quote:q 
-                    host-lang-expand:e 
-                    host-lang-s-expr:s 
+  host-lang-expr  = host-lang-quote:q
+                    host-lang-expand:e
+                    host-lang-s-expr:s
                     => (str-trim  (concatenate 'string q e s))
                    ;
 
@@ -149,9 +149,9 @@ ometa ometa-parser {
                        | '\''+:q => (coerce q 'string)
                        | => ""};
 
-  host-lang-expand  = {','+:q => (concatenate 'string q) 
-                       | => ""}:qq  
-                      {'@':a => (string a) 
+  host-lang-expand  = {','+:q => (concatenate 'string q)
+                       | => ""}:qq
+                      {'@':a => (string a)
                        | => ""}:aa => (concatenate 'string qq aa)
                     ;
 
@@ -161,15 +161,15 @@ ometa ometa-parser {
                                      "()")
                      ;
 
-  host-lang-atom    = host-lang-quote:q host-lang-expand:e 
-                      {   s-identifier                         
+  host-lang-atom    = host-lang-quote:q host-lang-expand:e
+                      {   s-identifier
                        }:a  => (concatenate 'string q e a);
 
-  s-identifier = {~{spacing | ';' | '(' | ')' | '}' | '{' | '|' } 
+  s-identifier = {~{spacing | ';' | '(' | ')' | '}' | '{' | '|' }
                  chr:c => c}+:xs spaces  => (coerce xs 'string);
 
 
-  prod-app = "<" identifier:p ">" 
+  prod-app = "<" identifier:p ">"
                  => `(apply ,p)
             |  identifier:p
                  => `(apply ,p)
@@ -185,7 +185,7 @@ ometa ometa-parser {
 
   prod-arg = data-element | identifier;
 
-  char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' chr:c => c}+:cs "'" 
+  char-sequence  = '\'' { '\\' '\'' | '\\' '\\' | ~'\'' chr:c => c}+:cs "'"
                      => `(seq ,(coerce cs 'string));
 
   char-sequence-s = '"' { '\\' '"' | '\\' '\\' | ~'"'  chr:c => c}*:cs "\"" => `(seq-s ,(coerce cs 'string));

@@ -1,6 +1,6 @@
-;; (let ((ometa-path (concatenate 'string 
-;;                                (directory-namestring 
-;;                                 *default-pathname-defaults*) 
+;; (let ((ometa-path (concatenate 'string
+;;                                (directory-namestring
+;;                                 *default-pathname-defaults*)
 ;;                                "../")))
 ;;   (push ometa-path asdf:*central-registry*))
 
@@ -22,12 +22,12 @@
     (if (eq tag 'error)
         (format nil "Error: ~a" val)
         (funcall resf val))))
-    
+
  ;;; matching and returning
 
 (defun parse-p ()
   (let ((src (file-string "src/ometa-parser.g")))
-    (o-report 
+    (o-report
      (lambda ()
        (ometa-match src 'ometa-parser 'ometa))
      (lambda (res)
@@ -35,8 +35,8 @@
 
 (defun tr-p ()
   (let ((ast (parse-p)))
-    (if ast 
-        (o-report 
+    (if ast
+        (o-report
          (lambda ()
            (ometa-match ast 'ometa-translator 'ometa))
          (lambda (res)
@@ -63,7 +63,7 @@
 (defun write-past ()
   (let ((ast (parse-p)))
     (if ast
-        (with-open-file (f (ensure-directories-exist "gen/ometa-parser.ast") 
+        (with-open-file (f (ensure-directories-exist "gen/ometa-parser.ast")
                            :direction :output
                            :if-exists :supersede)
           (format f "~w" ast)))
@@ -73,10 +73,10 @@
 (defun write-psrc ()
   (let ((ast (write-past)))
     (if ast
-        (o-report 
+        (o-report
          (lambda () (ometa-match ast 'ometa-translator 'ometa))
          (lambda (res)
-           (with-open-file (f (ensure-directories-exist "gen/ometa-parser.lisp") 
+           (with-open-file (f (ensure-directories-exist "gen/ometa-parser.lisp")
                               :direction :output
                               :if-exists :supersede)
              (format f "~(~{~w ~% ~}~)" res)))))))
@@ -84,7 +84,7 @@
 (defun write-tast ()
   (let ((ast (parse-t)))
     (if ast
-        (with-open-file (f (ensure-directories-exist "gen/ometa-translator.ast") 
+        (with-open-file (f (ensure-directories-exist "gen/ometa-translator.ast")
                            :direction :output
                            :if-exists :supersede)
           (format f "~w" ast)))
@@ -97,7 +97,7 @@
         (o-report
          (lambda () (ometa-match ast 'ometa-translator 'ometa))
          (lambda (res)
-           (with-open-file (f (ensure-directories-exist "gen/ometa-translator.lisp") 
+           (with-open-file (f (ensure-directories-exist "gen/ometa-translator.lisp")
                               :direction :output
                               :if-exists :supersede)
              (format t "~(~{~w ~% ~}~)" res)
@@ -133,7 +133,7 @@
     (if (eq tag 'error)
         val
         (ometa-match  val 'ometa-translator 'ometa))))
-  
+
 
 (defun match (filepath dest)
   (let ((data (file-string filepath)))

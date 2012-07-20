@@ -47,4 +47,3 @@
                    (progn
                      (read-all (subseq str pos) (cons seq r)))))))
     (reverse (read-all str nil))))
-    

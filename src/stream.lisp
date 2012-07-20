@@ -20,7 +20,7 @@
 
 (defclass ometa-stream ()
   ((head   :accessor stream-head
-           :initarg :head)   
+           :initarg :head)
    (input  :accessor stream-input
            :initarg :input)
    (idx    :accessor stream-index
@@ -72,7 +72,7 @@
 (defmethod make-ometa-stream (seq)
   (if (eq seq nil)
       (make-instance 'ometa-stream-end :input seq :idx 0)
-      (make-instance 'ometa-stream 
+      (make-instance 'ometa-stream
                      :input seq
                      :idx 0
                      :head (s-first seq))))
@@ -84,7 +84,7 @@
                  :idx -1
                  :line -1
                  :tail s))
-                 
+
 
 ;private
 (defun new-ometa-stream (lst line idx)
@@ -104,7 +104,7 @@
                                     (1+ (stream-index s)))))
         (unless (eq (class-name (class-of tail)) 'ometa-stream-end)
           (if (newline-p (stream-head tail))
-              (incf (slot-value tail 'line)))            
+              (incf (slot-value tail 'line)))
           (setf (slot-value s 'tail) tail))
         tail)))
 
@@ -116,7 +116,7 @@
   (let ((next (make-ometa-stream (stream-head s))))
     (setf (slot-value s 'branch) next)
     next))
-  
+
 
 (defmethod stream-current-phrase ((s ometa-stream))
   (let* ((input (subseq (stream-input s) (stream-index s)))
@@ -149,7 +149,7 @@
     (let ((res (lookup s)))
       (if res res s))))
 
- 
+
 ;; must check 2-ahead. basic rule "anything
 ;; ends up creating a tail for the current element
 (defmethod stream-ahead2-p ((s ometa-stream))
@@ -158,7 +158,7 @@
       (null (slot-value (slot-value s 'tail) 'tail))))
 
 ;; lookup the tails for the first element with valid index
-;; meaning, s might be an argument prepended. 
+;; meaning, s might be an argument prepended.
 ;; We want the original input
 (defmethod stream-next-from-input ((s ometa-stream))
   (labels ((lookup (cur)
@@ -170,7 +170,7 @@
 (defmethod stream-add-error ((s ometa-stream) rule)
   (let ((real-s (stream-next-from-input s)))
     (let ((hd (if (eq real-s s) nil (stream-head s)))) ;; I really can't remember what is this
-      (if (stream-ahead2-p real-s) ; we are the farthest scanned. 
+      (if (stream-ahead2-p real-s) ; we are the farthest scanned.
                                    ; substitute current errors with the new one
           (setf (slot-value real-s 'errors) (cons rule hd))))))
           ;; this is not the farthest error. join the errors
@@ -179,8 +179,7 @@
 (defmethod stream-get-pretty-error ((s ometa-stream))
   (let* ((last (stream-farthest-error-element s))
          (err (slot-value last 'errors)))
-    (format nil "[~d] near ~a. Expected ~a with '~a'" 
+    (format nil "[~d] near ~a. Expected ~a with '~a'"
             (stream-current-line last)
             (stream-current-phrase last)
             (car err) (cdr err))))
-                 
