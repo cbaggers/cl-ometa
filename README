@@ -1,3 +1,4 @@
- -- cl-ometa --
+cl-ometa
+========
 
-A Common Lisp implementation of the language OMeta.
+A Common Lisp implementation of the programming language OMeta.
