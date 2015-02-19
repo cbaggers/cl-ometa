@@ -1,13 +1,11 @@
-(in-package :asdf)
-(defpackage :cl-ometa (:use :cl :asdf))
+;;;; cl-ometa.asd
 
-(in-package :cl-ometa)
-
-(defsystem :cl-ometa
+(asdf:defsystem #:cl-ometa
   :name "cl-ometa"
   :author "Thago Silva <thiago@comum.org>"
   :description "A Common Lisp implementation of OMeta"
   :license "MIT"
+  :serial t
   :components ((:module "src"
                 :serial t
                 :components ((:file "packages")
